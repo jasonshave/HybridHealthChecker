@@ -52,62 +52,74 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     [CmdletBinding()]
  
     Param(
-        [Parameter()][string]$XamlPath = "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\MainWindow.xaml"
+        #[Parameter()]$Global:XamlPath = Get-Content -Path (Split-Path (Get-Module SkypeForBusinessHybridHealth).Path) + "\MainWindow.xaml"
     )
  
     begin {
-        #add reference for WPF
-        Add-Type -AssemblyName PresentationFramework
-
         #create runspace for multithreading
-        $Global:syncHash = [hashtable]::Synchronized(@{})
+        $uiHash = [hashtable]::Synchronized(@{})
+        $variableHash = [hashtable]::Synchronized(@{})
+
+        $variableHash.Add('2013Tools', "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx")
+        $variableHash.Add('2015Tools', "https://technet.microsoft.com/en-ca/library/dn933921.aspx")
+        $variableHash.Add('SFBOTools', "https://www.microsoft.com/en-us/download/details.aspx?id=39366")
+        $variableHash.Add('xmlWPF', (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml"))
+        
+        #create runspace and add hash tables as variables to it
         $newRunspace =[runspacefactory]::CreateRunspace()
         $newRunspace.ApartmentState = "STA"
         $newRunspace.ThreadOptions = "ReuseThread"         
         $newRunspace.Open()
-        $newRunspace.SessionStateProxy.SetVariable("syncHash",$syncHash)
+        $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
+        $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
 
-        $psCmd = [PowerShell]::Create().AddScript(
+    }
+
+    process {
+        $psCmd = [PowerShell]::Create()
+		$null = $psCmd.AddScript(
             {
-                #XamlConversion -xmlWpfPath $XamlPath
-                #$xmlWPF = Get-Content -Path $XamlPath
-                $xmlWPF = Get-Content -Path ".\HybridHealthChecker\MainWindow.xaml"
+                Add-Type -AssemblyName PresentationFramework
 
                 #scrape XAML for unwanted tags
-                [xml]$xAML = $xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+                [xml]$xAML = $variableHash.xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
                 $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
-                $syncHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
+                $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
 
+                #populate uiHash with XAML name tags so we can reference them in code (i.e. btnButton = $uiHash.btnButton.Add_Click)
                 $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
-                    $syncHash.Add($_.Name, $syncHash.Window.FindName($_.Name))
+                    $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
                 }
 
                 #place all events for the form within this $psCmd so they execute as they should
 
                 function FormFirstRun {
-                    $syncHash.comboVersion.SelectedIndex = 0
-                    $syncHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
+                    $uiHash.comboVersion.SelectedIndex = 0
+                    $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
+
+                    $uiHash.comboForest.SelectedIndex = 0
+                    $uiHash.comboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
 
                     #set the version attribute on the help tab
                     $modVer = (Get-Module SkypeForBusinessHybridHealth).Version
                     if (!($modVer)) {
-                        $syncHash.txtVersion.Text = "Unable to determine version"
+                        $uiHash.txtVersion.Text = "Unable to determine version"
                     } else {
-                        $syncHash.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
+                        $uiHash.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
                     }
                     
                 }
 
                 function FormCheckModules ($ModuleName) {
-    
+                    #detect modules for on-prem pieces
                     switch ($ModuleName) {
                         "Skype for Business Server 2015" { 
                             $ModuleName = "SkypeForBusiness"
-                            $syncHash.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
+                            $uiHash.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
                         }
                         "Lync Server 2013" {
                             $ModuleName = "Lync"
-                            $syncHash.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
+                            $uiHash.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
                         }
                         Default {
                             $ModuleName = "Skype for Business Server 2015"
@@ -115,58 +127,123 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                     }
                 
                     if (!(Get-Module $ModuleName -ListAvailable)) {
-                        $syncHash.btnAdminInstalled.IsEnabled = $true
-                        $syncHash.btnAdminInstalled.Content = "Install"
+                        $uiHash.btnAdminInstalled.IsEnabled = $true
+                        $uiHash.btnAdminInstalled.Content = "More Info"
                     } else {
-                        $syncHash.btnAdminInstalled.IsEnabled = $false
-                        $syncHash.btnAdminInstalled.Content = "Installed"
+                        $uiHash.btnAdminInstalled.IsEnabled = $false
+                        $uiHash.btnAdminInstalled.Content = "Installed"
+                    }
+
+                    #detect if SFBO module is available
+                    if (!(Get-Module SkypeOnlineConnector -ListAvailable)) {
+                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $true
+                        $uiHash.btnSFBOAdminInstalled.Content = "More Info"
+                    }
+
+                    if ($uiHash.btnAdminInstalled -and $uiHash.btnSFBOAdminInstalled) {
+                        $uiHash.btnStartTests.IsEnabled = $true
                     }
                 
                 }
 
+            #region TESTS
+
+                function GetForestData{
+                    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
+                    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
+                    $forestMode = $forestData.ForestMode
+
+                    [array]$outputResult = [PSCustomObject][ordered]@{
+                        TestId = '0001'
+                        TestName = 'GetForestData'
+                        TestedResult = $(if($uiHash.comboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
+                        ExpectedValue = $uiHash.comboForest.SelectedValue
+                        TestedValue = $forestMode
+                        TestMessage = $null
+                        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
+                        DestinationComputerName = $authDC
+                        TestDate = $(Get-Date)
+                    }
+                    
+                    $uiHash.gridResults.AddChild($outputResult)
+                }
+
+            #end region
+
                 #EVENTS#
-                $syncHash.Window.Add_Loaded(
+                $uiHash.Window.Add_Loaded(
                     {
                         FormFirstRun
-                        FormCheckModules($syncHash.comboVersion.SelectedValue)
+                        FormCheckModules($uiHash.comboVersion.SelectedValue)
                     }
                 )
 
-                $syncHash.comboVersion.Add_SelectionChanged(
+                $uiHash.comboVersion.Add_SelectionChanged(
                     {
-                        FormCheckModules($syncHash.comboVersion.SelectedValue)
+                        FormCheckModules($uiHash.comboVersion.SelectedValue)
                     }
                 )
 
-                $syncHash.btnAdminInstalled.Add_Click(
+                $uiHash.btnAdminInstalled.Add_Click(
                     {
-                        $syncHash.txtStatus1.Text = "foo"
+                        switch ($uiHash.comboVersion.SelectedValue) {
+                            "Skype for Business Server 2015" { Start-Process $variableHash['2015Tools'] }
+                            "Lync Server 2013" { Start-Process $variableHash['2013Tools'] }
+                        }
                     }
                 )
 
-                $syncHash.navFeedback.Add_Click(
+                $uiHash.btnSFBOAdminInstalled.Add_Click(
                     {
-                        Start-Process $syncHash.navFeedback.NavigateUri
+                        Start-Process $variableHash['SFBOTools']
                     }
                 )
 
-                $syncHash.Window.ShowDialog() | Out-Null
-                $syncHash.Error = $Error
+                $uiHash.navFeedback.Add_Click(
+                    {
+                        Start-Process $uiHash.navFeedback.NavigateUri
+                    }
+                )
+
+                $uiHash.navGitHub.Add_Click(
+                    {
+                        Start-Process $uiHash.navGitHub.NavigateUri
+                    }
+                )
+                
+                $uiHash.btnStartTests.Add_Click(
+                    {
+                        #clear previous test results
+                        $uiHash.gridResults.Items.Clear()
+
+                        #display progress bar
+                        $uiHash.barStatus.Visibility = "Visible"
+                        #update statusbar
+                        $uiHash.txtStatus1.Text = "Starting tests..."
+
+                        #switch to results tab
+                        $uiHash.tabMain.SelectedIndex = 1
+
+                        #start first test (need a runspace for this)
+                        GetForestData
+
+                        #wrap it up
+                        $uiHash.txtStatus1.Text = "Finished"
+                        $uiHash.barStatus.Visibility = "Hidden"
+                    }
+                )
+
+                #START THE FORM#
+                $uiHash.Window.ShowDialog() | Out-Null
+                $uiHash.Error = $Error
             }
         )
 
-
-
-
-        
-    }
-
-    process {
         #wire up form objects before presenting the GUI
         #create a new runspace for the XAML code
         $psCmd.Runspace = $newRunspace
-        $data = $psCmd.BeginInvoke()
-        $foo
+        $uiHandle = $psCmd.BeginInvoke()
+        
     }
 
     end {
@@ -176,14 +253,6 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 }
 
 # INTERNAL FUNCTIONS #
-function UpdateWindow {
-
-}
-
-
-
-
-
 function InstallAdminTools ($Version) {
     #verify all tools are available
     $binPath = (get-module SkypeForBusinessHybridHealth).modulebase + "\bin"
@@ -254,58 +323,9 @@ function ModuleValidation{
     end {}
 }
 
-function GetAuthDc{
-    [cmdletbinding()]
-    Param()
 
-    begin {}
-    process {
-        if (!$resources.DomainControllerComputerName){
-            #parse domain controller from environment variables since no DC was given
-            $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
-            Write-Verbose -Message "$($resources.DomainControllerAuthMessage) $($authDC)"
-        }else{
-            #the user specified a Domain Controller in the resources file to use
-            $authDC = $resources.DomainController
-        }
-    }
-    end {
-        return $authDC
-    }
-}
 
-function GetDomainControllerData{
-    [cmdletbinding()]
-    Param()
 
-    begin {}
-    process {
-        #perform PowerShell remoting to get DC version data.
-        $commandToExecute = [scriptblock]::Create($resources.DomainControllerCheckCmd)
-        try{
-            $domainControllerData = Invoke-Command -ComputerName $authDC -ScriptBlock $commandToExecute -ErrorAction SilentlyContinue  -ErrorVariable dcErr
-        }catch{
-            #process this exception as the result
-            $authDCResult = ProcessResult -testId $resources.DomainControllerTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.DomainControllerErrorMessage -testExpectedValue $resources.DomainControllerMinimumVersion -testValue $_
-            return
-        }finally{
-            if (!$dcErr){
-                #didn't throw an exception and there was no error
-                $dcVer = ($domainControllerData.OperatingSystemVersion).split(" ")[0] #parse version
-                Write-Verbose -Message $($resources.DomainControllerMinimumVersionMessage + $dcVer)
-    
-                #compare expected version with discovered version
-                $authDCResult = ProcessResult -testId $resources.DomainControllerTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.DomainControllerErrorMessage -testSuccessMessage $resources.DomainControllerSuccessMessage -testExpectedValue $resources.DomainControllerMinimumVersion -testValue $dcVer
-            }else{
-                #there was an error, write the result
-                $authDCResult = ProcessResult -testId $resources.DomainControllerTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.DomainControllerErrorMessage -testExpectedValue $resources.DomainControllerMinimumVersion -testValue $dcErr.ErrorDetails.Message
-            }
-        }
-    }
-    end {
-        return $authDCResult
-    }
-}
 
 function GetForestData{
     [cmdletbinding()]
@@ -845,8 +865,8 @@ function XamlConversion {
         
         $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
         
-        $syncHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
-        $syncHash.Text
+        $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
+        $uiHash.Text
 
         #try {
         #    $formMain = [Windows.Markup.XamlReader]::Load($xmlReader)
@@ -858,8 +878,8 @@ function XamlConversion {
         $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
             #Set-Variable -Name "SFB$($_.Name)" -Value $formMain.FindName($_.Name) -Scope Global -Force -ErrorAction Stop
             
-            #add form members to syncHash
-            $syncHash.Add($_.Name, $syncHash.Window.FindName($_.Name))
+            #add form members to uiHash
+            $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
         }
 
     }
