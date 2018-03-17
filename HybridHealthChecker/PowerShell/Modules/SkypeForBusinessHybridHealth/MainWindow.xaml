@@ -25,7 +25,7 @@
 
             <TabItem Name="tabResults" Header="Results">
                 <Grid>
-                    <DataGrid Name="gridResults" Margin="2,2,2,2" >
+                    <DataGrid Name="gridResults" Visibility="Hidden" Margin="2,2,2,2" >
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Test Id" Binding="{Binding 'TestId'}" Width="SizeToCells" />
                             <DataGridTextColumn Header="Test Name" Binding="{Binding 'TestName'}" Width="SizeToCells" />

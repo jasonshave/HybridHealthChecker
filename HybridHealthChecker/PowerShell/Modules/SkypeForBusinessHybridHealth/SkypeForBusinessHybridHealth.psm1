@@ -56,10 +56,13 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     )
  
     begin {
-        #create runspace for multithreading
+        $runspaceHash = [hashtable]::Synchronized(@{})
         $uiHash = [hashtable]::Synchronized(@{})
+        $uiHash.jobFlag = $true
+        
+        $jobs = [system.collections.arraylist]::Synchronized((New-Object System.Collections.Arraylist))
+        
         $variableHash = [hashtable]::Synchronized(@{})
-
         $variableHash.Add('2013Tools', "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx")
         $variableHash.Add('2015Tools', "https://technet.microsoft.com/en-ca/library/dn933921.aspx")
         $variableHash.Add('SFBOTools', "https://www.microsoft.com/en-us/download/details.aspx?id=39366")
@@ -72,12 +75,12 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
         $newRunspace.Open()
         $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
         $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
+        $newRunspace.SessionStateProxy.SetVariable("jobs",$jobs)
 
     }
 
     process {
-        $psCmd = [PowerShell]::Create()
-		$null = $psCmd.AddScript(
+        $psCmd = [PowerShell]::Create().AddScript(
             {
                 Add-Type -AssemblyName PresentationFramework
 
@@ -90,9 +93,30 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                 $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
                     $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
                 }
+            <#
+                #Jobs runspace
+                $jobsRunspace = [runspacefactory]::CreateRunspace()
+                $jobsRunspace.Open()
+                $jobsRunspace.SessionStateProxy.SetVariable("uihash",$uiHash)
+                $jobsRunspace.SessionStateProxy.SetVariable("jobs",$jobs)
+                $runspaceHash.PowerShell = [powershell]::Create().AddScript({
+                    While ($uihash.jobFlag) {
+                        If ($jobs.Handle.IsCompleted) {
+                            $jobs.PowerShell.EndInvoke($jobs.handle)
+                            $jobs.PowerShell.Dispose()
+                            $jobs.clear()
+                        }
+                    }
+                })
+            
+                $runspaceHash.PowerShell.Runspace = $jobsRunspace
+                $runspaceHash.Handle = $runspaceHash.PowerShell.BeginInvoke()
 
+                $running = $false
+            #>
                 #place all events for the form within this $psCmd so they execute as they should
 
+            #region FUNCTIONS
                 function FormFirstRun {
                     $uiHash.comboVersion.SelectedIndex = 0
                     $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
@@ -146,9 +170,8 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                 
                 }
 
-            #region TESTS
-
                 function GetForestData{
+                    
                     $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
                     $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
                     $forestMode = $forestData.ForestMode
@@ -170,11 +193,20 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
             #end region
 
-                #EVENTS#
+            #region EVENTS
                 $uiHash.Window.Add_Loaded(
                     {
                         FormFirstRun
                         FormCheckModules($uiHash.comboVersion.SelectedValue)
+                    }
+                )
+
+                $uiHash.Window.Add_Closed(
+                    {
+                        $uiHash.jobFlag = $false
+                        $runspaceHash.PowerShell.EndInvoke($runspaceHash.Handle)
+                        $runspaceHash.PowerShell.Dispose()
+                        $runspaceHash.Clear()
                     }
                 )
 
@@ -216,22 +248,26 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         #clear previous test results
                         $uiHash.gridResults.Items.Clear()
 
-                        #display progress bar
-                        $uiHash.barStatus.Visibility = "Visible"
-                        #update statusbar
-                        $uiHash.txtStatus1.Text = "Starting tests..."
+                        $uiHash.gridResults.Visibility = "Visible"
 
                         #switch to results tab
                         $uiHash.tabMain.SelectedIndex = 1
 
-                        #start first test (need a runspace for this)
-                        GetForestData
+                        $jobMonitor = Start-Job -ScriptBlock {
+                            GetForestData
+                        } -Name GetForestData
+                        do {
+                            $uiHash.txtStatus1.Text = "Running test $jobMontior.Name..."
+                        } until ($jobMonitor.State -ne "Running")
+                        Receive-Job -Name $jobMonitor.Name
+                        #GetForestData
 
                         #wrap it up
                         $uiHash.txtStatus1.Text = "Finished"
                         $uiHash.barStatus.Visibility = "Hidden"
                     }
                 )
+            #end region
 
                 #START THE FORM#
                 $uiHash.Window.ShowDialog() | Out-Null
