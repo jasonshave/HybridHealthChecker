@@ -119,9 +119,10 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                 $SFBgridResults.Items.Clear()
                 $SFBgridResults.Visibility = "Visible"
                 $SFBtabMain.SelectedIndex = 1
-
-                
-    
+                $SFBtxtDebug.Dispatcher.Invoke([action]{
+                    
+                })
+                <#
                     $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
                     $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
                     $forestMode = $forestData.ForestMode
@@ -138,10 +139,10 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         TestDate = $(Get-Date)
                     }
 
-                #Start-Job -ScriptBlock $foo -Name GetForestData | Wait-Job | Receive-Job
+                    #Start-Job -ScriptBlock $foo -Name GetForestData | Wait-Job | Receive-Job
 
-                $SFBgridResults.AddChild($outputResult)
-                
+                    $SFBgridResults.AddChild($outputResult)
+                #>
                 
                 #wrap it up
                 $SFBtxtStatus1.Text = "Finished"

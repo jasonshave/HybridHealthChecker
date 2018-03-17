@@ -51,6 +51,11 @@
 
                 </Grid>
             </TabItem>
+            <TabItem Name="tabDebug" Header="Debug">
+                <Grid>
+                    <TextBox Name="txtDebug">Text</TextBox>
+                </Grid>
+            </TabItem>
 
         </TabControl>
         <StatusBar DockPanel.Dock="Bottom" Background="#FF0874AA" Height="34" VerticalAlignment="Bottom" >
