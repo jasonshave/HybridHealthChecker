@@ -67,71 +67,85 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
     process {
 
-        $SFBMainForm.Window.Add_Loaded(
+        $SFBMainForm.Add_Loaded(
             {
                 FormFirstRun
-                FormCheckModules($SFBMainForm.comboVersion.SelectedValue)
+                FormCheckModules($SFBcomboVersion.SelectedValue)
             }
         )
 
-        $SFBMainForm.Window.Add_Closed(
+        $SFBMainForm.Add_Closed(
             {
  
             }
         )
 
-        $SFBMainForm.comboVersion.Add_SelectionChanged(
+        $SFBcomboVersion.Add_SelectionChanged(
             {
-                FormCheckModules($SFBMainForm.comboVersion.SelectedValue)
+                FormCheckModules($SFBcomboVersion.SelectedValue)
             }
         )
 
-        $SFBMainForm.btnAdminInstalled.Add_Click(
+        $SFBbtnAdminInstalled.Add_Click(
             {
-                switch ($SFBMainForm.comboVersion.SelectedValue) {
+                switch ($SFBcomboVersion.SelectedValue) {
                     "Skype for Business Server 2015" { Start-Process $2015Tools }
                     "Lync Server 2013" { Start-Process $2013Tools }
                 }
             }
         )
 
-        $SFBMainForm.btnSFBOAdminInstalled.Add_Click(
+        $SFBbtnSFBOAdminInstalled.Add_Click(
             {
                 Start-Process $SFBOTools]
             }
         )
 
-        $SFBMainForm.navFeedback.Add_Click(
+        $SFBnavFeedback.Add_Click(
             {
-                Start-Process $SFBMainForm.navFeedback.NavigateUri
+                Start-Process $SFBnavFeedback.NavigateUri
             }
         )
 
-        $SFBMainForm.navGitHub.Add_Click(
+        $SFBnavGitHub.Add_Click(
             {
-                Start-Process $SFBMainForm.navGitHub.NavigateUri
+                Start-Process $SFBnavGitHub.NavigateUri
             }
         )
         
-        $SFBMainForm.btnStartTests.Add_Click(
+        $SFBbtnStartTests.Add_Click(
             {
                 #clear previous test results
-                $SFBMainForm.gridResults.Items.Clear()
-                $SFBMainForm.gridResults.Visibility = "Visible"
-                $SFBMainForm.tabMain.SelectedIndex = 1
+                $SFBgridResults.Items.Clear()
+                $SFBgridResults.Visibility = "Visible"
+                $SFBtabMain.SelectedIndex = 1
 
-                $jobMonitor = Start-Job -ScriptBlock {
-                    GetForestData
-                } -Name GetForestData
-                do {
-                    $SFBMainForm.txtStatus1.Text = "Running test $jobMontior.Name..."
-                } until ($jobMonitor.State -ne "Running")
-                Receive-Job -Name $jobMonitor.Name
-                #GetForestData
+                
+    
+                    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
+                    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
+                    $forestMode = $forestData.ForestMode
 
+                    [array]$outputResult = [PSCustomObject][ordered]@{
+                        TestId = '0001'
+                        TestName = 'GetForestData'
+                        TestedResult = $(if($SFBcomboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
+                        ExpectedValue = $SFBcomboForest.SelectedValue
+                        TestedValue = $forestMode
+                        TestMessage = $null
+                        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
+                        DestinationComputerName = $authDC
+                        TestDate = $(Get-Date)
+                    }
+
+                #Start-Job -ScriptBlock $foo -Name GetForestData | Wait-Job | Receive-Job
+
+                $SFBgridResults.AddChild($outputResult)
+                
+                
                 #wrap it up
-                $SFBMainForm.txtStatus1.Text = "Finished"
-                $SFBMainForm.barStatus.Visibility = "Hidden"
+                $SFBtxtStatus1.Text = "Finished"
+                $SFBbarStatus.Visibility = "Hidden"
             }
         )
 
@@ -181,18 +195,18 @@ function XamlConversion {
 }
 
 function FormFirstRun {
-    $SFBMainForm.comboVersion.SelectedIndex = 0
-    $SFBMainForm.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
+    $SFBcomboVersion.SelectedIndex = 0
+    $SFBcomboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
 
-    $SFBMainForm.comboForest.SelectedIndex = 0
-    $SFBMainForm.comboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
+    $SFBcomboForest.SelectedIndex = 0
+    $SFBcomboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
 
     #set the version attribute on the help tab
     $modVer = (Get-Module SkypeForBusinessHybridHealth).Version
     if (!($modVer)) {
-        $SFBMainForm.txtVersion.Text = "Unable to determine version"
+        $SFBtxtVersion.Text = "Unable to determine version"
     } else {
-        $SFBMainForm.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
+        #$SFBtxtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
     }
     
 }
@@ -202,11 +216,11 @@ function FormCheckModules ($ModuleName) {
     switch ($ModuleName) {
         "Skype for Business Server 2015" { 
             $ModuleName = "SkypeForBusiness"
-            $SFBMainForm.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
+            $SFBtxtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
         }
         "Lync Server 2013" {
             $ModuleName = "Lync"
-            $SFBMainForm.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
+            $SFBtxtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
         }
         Default {
             $ModuleName = "Skype for Business Server 2015"
@@ -214,45 +228,50 @@ function FormCheckModules ($ModuleName) {
     }
 
     if (!(Get-Module $ModuleName -ListAvailable)) {
-        $SFBMainForm.btnAdminInstalled.IsEnabled = $true
-        $SFBMainForm.btnAdminInstalled.Content = "More Info"
+        $SFBbtnAdminInstalled.IsEnabled = $true
+        $SFBbtnAdminInstalled.Content = "More Info"
     } else {
-        $SFBMainForm.btnAdminInstalled.IsEnabled = $false
-        $SFBMainForm.btnAdminInstalled.Content = "Installed"
+        $SFBbtnAdminInstalled.IsEnabled = $false
+        $SFBbtnAdminInstalled.Content = "Installed"
     }
 
     #detect if SFBO module is available
     if (!(Get-Module SkypeOnlineConnector -ListAvailable)) {
-        $SFBMainForm.btnSFBOAdminInstalled.IsEnabled = $true
-        $SFBMainForm.btnSFBOAdminInstalled.Content = "More Info"
+        $SFBbtnSFBOAdminInstalled.IsEnabled = $true
+        $SFBbtnSFBOAdminInstalled.Content = "More Info"
     }
 
-    if ($SFBMainForm.btnAdminInstalled -and $SFBMainForm.btnSFBOAdminInstalled) {
-        $SFBMainForm.btnStartTests.IsEnabled = $true
+    if ($SFBbtnAdminInstalled -and $SFBbtnSFBOAdminInstalled) {
+        $SFBbtnStartTests.IsEnabled = $true
     }
 
 }
 
-function GetForestData{
-    
-    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
-    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
-    $forestMode = $forestData.ForestMode
+$someFunctions = {
 
-    [array]$outputResult = [PSCustomObject][ordered]@{
-        TestId = '0001'
-        TestName = 'GetForestData'
-        TestedResult = $(if($SFBMainForm.comboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
-        ExpectedValue = $SFBMainForm.comboForest.SelectedValue
-        TestedValue = $forestMode
-        TestMessage = $null
-        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
-        DestinationComputerName = $authDC
-        TestDate = $(Get-Date)
-    }
+    function GetForestData{
     
-    $SFBMainForm.gridResults.AddChild($outputResult)
+        $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
+        $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
+        $forestMode = $forestData.ForestMode
+    
+        [array]$outputResult = [PSCustomObject][ordered]@{
+            TestId = '0001'
+            TestName = 'GetForestData'
+            TestedResult = $(if($SFBcomboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
+            ExpectedValue = $SFBcomboForest.SelectedValue
+            TestedValue = $forestMode
+            TestMessage = $null
+            SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
+            DestinationComputerName = $authDC
+            TestDate = $(Get-Date)
+        }
+        
+        $SFBgridResults.AddChild($outputResult)
+    }
 }
+
+
 
 function InstallAdminTools ($Version) {
     #verify all tools are available
@@ -322,45 +341,6 @@ function ModuleValidation{
         }
     }
     end {}
-}
-
-
-
-
-
-function GetForestData{
-    [cmdletbinding()]
-    Param()
-    begin {
-
-    }
-    process {
-        #perform PowerShell remoting to get Forest data.
-        $commandToExecute = [scriptblock]::Create($resources.ForestModeCheckCmd)
-        try{
-            $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock $commandToExecute -ErrorAction SilentlyContinue -ErrorVariable forestErr
-        }catch{
-            #process this exception as the test result
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $_
-            return
-        }
-
-        if (!$forestErr){
-            #didn't throw an exception and there was no error
-            Write-Verbose -Message $($resources.ForestModeMessage + $forestData.ForestMode)
-
-            #compare expected version with discovered version
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testSuccessMessage $resources.ForestModeSuccessMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $forestData.ForestMode
-        }else{
-            #there was an error, write the result
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $forestErr.ErrorDetails.Message
-        }
-
-
-    }
-    end {
-        return $forestModeResult
-    }
 }
 
 function GetCmsReplicationStatus{
@@ -843,51 +823,3 @@ function GetTenantInfo{
         return $autodiscoverUrl
     }
 }
-
-function XamlConversion {
-    [CmdletBinding()]
-    param (
-        [parameter(Mandatory=$true)][string]$xmlWpfPath
-    )
-
-    begin {
-
-    }
-
-    process {
-        #get raw XAML file
-        $Global:xmlWPF = Get-Content -Path $xmlWpfPath
-
-        #scrape XAML for unwanted tags
-        [xml]$xAML = $xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
-
-        #create script instance of XAML content
-        $psCmd = [PowerShell]::Create().AddScript({$xAML})
-        
-        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
-        
-        #$SFBMainForm.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
-        #$SFBMainForm.Text
-
-        try {
-            $formMain = [Windows.Markup.XamlReader]::Load($xmlReader)
-        } catch {
-            Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged properties (PowerShell cannot process them)"
-            throw;
-        }
-        
-        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
-            #Set-Variable -Name "SFB$($_.Name)" -Value $formMain.FindName($_.Name) -Scope Global -Force -ErrorAction Stop
-            
-            #add form members to uiHash
-            $SFBMainForm.Add($_.Name, $SFBMainForm.Window.FindName($_.Name))
-        }
-
-    }
-
-    end {
-        return $formMain
-    }
-}
-
-
