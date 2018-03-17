@@ -56,229 +56,86 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     )
  
     begin {
-        $runspaceHash = [hashtable]::Synchronized(@{})
-        $uiHash = [hashtable]::Synchronized(@{})
-        $uiHash.jobFlag = $true
-        
-        $jobs = [system.collections.arraylist]::Synchronized((New-Object System.Collections.Arraylist))
-        
-        $variableHash = [hashtable]::Synchronized(@{})
-        $variableHash.Add('2013Tools', "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx")
-        $variableHash.Add('2015Tools', "https://technet.microsoft.com/en-ca/library/dn933921.aspx")
-        $variableHash.Add('SFBOTools', "https://www.microsoft.com/en-us/download/details.aspx?id=39366")
-        $variableHash.Add('xmlWPF', (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml"))
-        
-        #create runspace and add hash tables as variables to it
-        $newRunspace =[runspacefactory]::CreateRunspace()
-        $newRunspace.ApartmentState = "STA"
-        $newRunspace.ThreadOptions = "ReuseThread"         
-        $newRunspace.Open()
-        $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
-        $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
-        $newRunspace.SessionStateProxy.SetVariable("jobs",$jobs)
+        #set constants
+        $2013Tools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
+        $2015Tools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
+        $SFBOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
 
+        $XamlPath = "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml"
+        $formMain = XamlConversion -xmlWpfPath $XamlPath
     }
 
     process {
-        $psCmd = [PowerShell]::Create().AddScript(
+
+        $SFBMainForm.Window.Add_Loaded(
             {
-                Add-Type -AssemblyName PresentationFramework
-
-                #scrape XAML for unwanted tags
-                [xml]$xAML = $variableHash.xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
-                $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
-                $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
-
-                #populate uiHash with XAML name tags so we can reference them in code (i.e. btnButton = $uiHash.btnButton.Add_Click)
-                $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
-                    $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
-                }
-            <#
-                #Jobs runspace
-                $jobsRunspace = [runspacefactory]::CreateRunspace()
-                $jobsRunspace.Open()
-                $jobsRunspace.SessionStateProxy.SetVariable("uihash",$uiHash)
-                $jobsRunspace.SessionStateProxy.SetVariable("jobs",$jobs)
-                $runspaceHash.PowerShell = [powershell]::Create().AddScript({
-                    While ($uihash.jobFlag) {
-                        If ($jobs.Handle.IsCompleted) {
-                            $jobs.PowerShell.EndInvoke($jobs.handle)
-                            $jobs.PowerShell.Dispose()
-                            $jobs.clear()
-                        }
-                    }
-                })
-            
-                $runspaceHash.PowerShell.Runspace = $jobsRunspace
-                $runspaceHash.Handle = $runspaceHash.PowerShell.BeginInvoke()
-
-                $running = $false
-            #>
-                #place all events for the form within this $psCmd so they execute as they should
-
-            #region FUNCTIONS
-                function FormFirstRun {
-                    $uiHash.comboVersion.SelectedIndex = 0
-                    $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
-
-                    $uiHash.comboForest.SelectedIndex = 0
-                    $uiHash.comboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
-
-                    #set the version attribute on the help tab
-                    $modVer = (Get-Module SkypeForBusinessHybridHealth).Version
-                    if (!($modVer)) {
-                        $uiHash.txtVersion.Text = "Unable to determine version"
-                    } else {
-                        $uiHash.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
-                    }
-                    
-                }
-
-                function FormCheckModules ($ModuleName) {
-                    #detect modules for on-prem pieces
-                    switch ($ModuleName) {
-                        "Skype for Business Server 2015" { 
-                            $ModuleName = "SkypeForBusiness"
-                            $uiHash.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
-                        }
-                        "Lync Server 2013" {
-                            $ModuleName = "Lync"
-                            $uiHash.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
-                        }
-                        Default {
-                            $ModuleName = "Skype for Business Server 2015"
-                        }
-                    }
-                
-                    if (!(Get-Module $ModuleName -ListAvailable)) {
-                        $uiHash.btnAdminInstalled.IsEnabled = $true
-                        $uiHash.btnAdminInstalled.Content = "More Info"
-                    } else {
-                        $uiHash.btnAdminInstalled.IsEnabled = $false
-                        $uiHash.btnAdminInstalled.Content = "Installed"
-                    }
-
-                    #detect if SFBO module is available
-                    if (!(Get-Module SkypeOnlineConnector -ListAvailable)) {
-                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $true
-                        $uiHash.btnSFBOAdminInstalled.Content = "More Info"
-                    }
-
-                    if ($uiHash.btnAdminInstalled -and $uiHash.btnSFBOAdminInstalled) {
-                        $uiHash.btnStartTests.IsEnabled = $true
-                    }
-                
-                }
-
-                function GetForestData{
-                    
-                    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
-                    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
-                    $forestMode = $forestData.ForestMode
-
-                    [array]$outputResult = [PSCustomObject][ordered]@{
-                        TestId = '0001'
-                        TestName = 'GetForestData'
-                        TestedResult = $(if($uiHash.comboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
-                        ExpectedValue = $uiHash.comboForest.SelectedValue
-                        TestedValue = $forestMode
-                        TestMessage = $null
-                        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
-                        DestinationComputerName = $authDC
-                        TestDate = $(Get-Date)
-                    }
-                    
-                    $uiHash.gridResults.AddChild($outputResult)
-                }
-
-            #end region
-
-            #region EVENTS
-                $uiHash.Window.Add_Loaded(
-                    {
-                        FormFirstRun
-                        FormCheckModules($uiHash.comboVersion.SelectedValue)
-                    }
-                )
-
-                $uiHash.Window.Add_Closed(
-                    {
-                        $uiHash.jobFlag = $false
-                        $runspaceHash.PowerShell.EndInvoke($runspaceHash.Handle)
-                        $runspaceHash.PowerShell.Dispose()
-                        $runspaceHash.Clear()
-                    }
-                )
-
-                $uiHash.comboVersion.Add_SelectionChanged(
-                    {
-                        FormCheckModules($uiHash.comboVersion.SelectedValue)
-                    }
-                )
-
-                $uiHash.btnAdminInstalled.Add_Click(
-                    {
-                        switch ($uiHash.comboVersion.SelectedValue) {
-                            "Skype for Business Server 2015" { Start-Process $variableHash['2015Tools'] }
-                            "Lync Server 2013" { Start-Process $variableHash['2013Tools'] }
-                        }
-                    }
-                )
-
-                $uiHash.btnSFBOAdminInstalled.Add_Click(
-                    {
-                        Start-Process $variableHash['SFBOTools']
-                    }
-                )
-
-                $uiHash.navFeedback.Add_Click(
-                    {
-                        Start-Process $uiHash.navFeedback.NavigateUri
-                    }
-                )
-
-                $uiHash.navGitHub.Add_Click(
-                    {
-                        Start-Process $uiHash.navGitHub.NavigateUri
-                    }
-                )
-                
-                $uiHash.btnStartTests.Add_Click(
-                    {
-                        #clear previous test results
-                        $uiHash.gridResults.Items.Clear()
-
-                        $uiHash.gridResults.Visibility = "Visible"
-
-                        #switch to results tab
-                        $uiHash.tabMain.SelectedIndex = 1
-
-                        $jobMonitor = Start-Job -ScriptBlock {
-                            GetForestData
-                        } -Name GetForestData
-                        do {
-                            $uiHash.txtStatus1.Text = "Running test $jobMontior.Name..."
-                        } until ($jobMonitor.State -ne "Running")
-                        Receive-Job -Name $jobMonitor.Name
-                        #GetForestData
-
-                        #wrap it up
-                        $uiHash.txtStatus1.Text = "Finished"
-                        $uiHash.barStatus.Visibility = "Hidden"
-                    }
-                )
-            #end region
-
-                #START THE FORM#
-                $uiHash.Window.ShowDialog() | Out-Null
-                $uiHash.Error = $Error
+                FormFirstRun
+                FormCheckModules($SFBMainForm.comboVersion.SelectedValue)
             }
         )
 
-        #wire up form objects before presenting the GUI
-        #create a new runspace for the XAML code
-        $psCmd.Runspace = $newRunspace
-        $uiHandle = $psCmd.BeginInvoke()
+        $SFBMainForm.Window.Add_Closed(
+            {
+ 
+            }
+        )
+
+        $SFBMainForm.comboVersion.Add_SelectionChanged(
+            {
+                FormCheckModules($SFBMainForm.comboVersion.SelectedValue)
+            }
+        )
+
+        $SFBMainForm.btnAdminInstalled.Add_Click(
+            {
+                switch ($SFBMainForm.comboVersion.SelectedValue) {
+                    "Skype for Business Server 2015" { Start-Process $2015Tools }
+                    "Lync Server 2013" { Start-Process $2013Tools }
+                }
+            }
+        )
+
+        $SFBMainForm.btnSFBOAdminInstalled.Add_Click(
+            {
+                Start-Process $SFBOTools]
+            }
+        )
+
+        $SFBMainForm.navFeedback.Add_Click(
+            {
+                Start-Process $SFBMainForm.navFeedback.NavigateUri
+            }
+        )
+
+        $SFBMainForm.navGitHub.Add_Click(
+            {
+                Start-Process $SFBMainForm.navGitHub.NavigateUri
+            }
+        )
+        
+        $SFBMainForm.btnStartTests.Add_Click(
+            {
+                #clear previous test results
+                $SFBMainForm.gridResults.Items.Clear()
+                $SFBMainForm.gridResults.Visibility = "Visible"
+                $SFBMainForm.tabMain.SelectedIndex = 1
+
+                $jobMonitor = Start-Job -ScriptBlock {
+                    GetForestData
+                } -Name GetForestData
+                do {
+                    $SFBMainForm.txtStatus1.Text = "Running test $jobMontior.Name..."
+                } until ($jobMonitor.State -ne "Running")
+                Receive-Job -Name $jobMonitor.Name
+                #GetForestData
+
+                #wrap it up
+                $SFBMainForm.txtStatus1.Text = "Finished"
+                $SFBMainForm.barStatus.Visibility = "Hidden"
+            }
+        )
+
+        $formMain.ShowDialog()
         
     }
 
@@ -289,6 +146,114 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 }
 
 # INTERNAL FUNCTIONS #
+function XamlConversion {
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory=$true)][string]$xmlWpfPath
+    )
+
+    begin {
+        Add-Type -AssemblyName PresentationFramework
+        $Global:xmlWPF = Get-Content -Path $xmlWpfPath
+    }
+
+    process {
+        #consume XML and strip unwanted tags
+        [xml]$xAML = $xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
+
+        try {
+            $formMain = [Windows.Markup.XamlReader]::Load( $xmlReader )
+        } catch {
+            Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged properties (PowerShell cannot process them)"
+            throw;
+        }
+        
+        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
+            Set-Variable -Name "SFB$($_.Name)" -Value $formMain.FindName($_.Name) -Scope Global -Force -ErrorAction Stop
+        }
+
+    }
+
+    end {
+        return $formMain
+    }
+}
+
+function FormFirstRun {
+    $SFBMainForm.comboVersion.SelectedIndex = 0
+    $SFBMainForm.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
+
+    $SFBMainForm.comboForest.SelectedIndex = 0
+    $SFBMainForm.comboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
+
+    #set the version attribute on the help tab
+    $modVer = (Get-Module SkypeForBusinessHybridHealth).Version
+    if (!($modVer)) {
+        $SFBMainForm.txtVersion.Text = "Unable to determine version"
+    } else {
+        $SFBMainForm.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
+    }
+    
+}
+
+function FormCheckModules ($ModuleName) {
+    #detect modules for on-prem pieces
+    switch ($ModuleName) {
+        "Skype for Business Server 2015" { 
+            $ModuleName = "SkypeForBusiness"
+            $SFBMainForm.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
+        }
+        "Lync Server 2013" {
+            $ModuleName = "Lync"
+            $SFBMainForm.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
+        }
+        Default {
+            $ModuleName = "Skype for Business Server 2015"
+        }
+    }
+
+    if (!(Get-Module $ModuleName -ListAvailable)) {
+        $SFBMainForm.btnAdminInstalled.IsEnabled = $true
+        $SFBMainForm.btnAdminInstalled.Content = "More Info"
+    } else {
+        $SFBMainForm.btnAdminInstalled.IsEnabled = $false
+        $SFBMainForm.btnAdminInstalled.Content = "Installed"
+    }
+
+    #detect if SFBO module is available
+    if (!(Get-Module SkypeOnlineConnector -ListAvailable)) {
+        $SFBMainForm.btnSFBOAdminInstalled.IsEnabled = $true
+        $SFBMainForm.btnSFBOAdminInstalled.Content = "More Info"
+    }
+
+    if ($SFBMainForm.btnAdminInstalled -and $SFBMainForm.btnSFBOAdminInstalled) {
+        $SFBMainForm.btnStartTests.IsEnabled = $true
+    }
+
+}
+
+function GetForestData{
+    
+    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
+    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
+    $forestMode = $forestData.ForestMode
+
+    [array]$outputResult = [PSCustomObject][ordered]@{
+        TestId = '0001'
+        TestName = 'GetForestData'
+        TestedResult = $(if($SFBMainForm.comboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
+        ExpectedValue = $SFBMainForm.comboForest.SelectedValue
+        TestedValue = $forestMode
+        TestMessage = $null
+        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
+        DestinationComputerName = $authDC
+        TestDate = $(Get-Date)
+    }
+    
+    $SFBMainForm.gridResults.AddChild($outputResult)
+}
+
 function InstallAdminTools ($Version) {
     #verify all tools are available
     $binPath = (get-module SkypeForBusinessHybridHealth).modulebase + "\bin"
@@ -901,21 +866,21 @@ function XamlConversion {
         
         $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
         
-        $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
-        $uiHash.Text
+        #$SFBMainForm.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
+        #$SFBMainForm.Text
 
-        #try {
-        #    $formMain = [Windows.Markup.XamlReader]::Load($xmlReader)
-        #} catch {
-        #    Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged properties (PowerShell cannot process them)"
-        #    throw;
-        #}
+        try {
+            $formMain = [Windows.Markup.XamlReader]::Load($xmlReader)
+        } catch {
+            Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged properties (PowerShell cannot process them)"
+            throw;
+        }
         
         $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
             #Set-Variable -Name "SFB$($_.Name)" -Value $formMain.FindName($_.Name) -Scope Global -Force -ErrorAction Stop
             
             #add form members to uiHash
-            $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
+            $SFBMainForm.Add($_.Name, $SFBMainForm.Window.FindName($_.Name))
         }
 
     }
