@@ -3,6 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         Name="MainForm" Title="Microsoft 365 FastTrack" Height="550" Width="1000" Background="#FF0874AA" MinWidth="900" MinHeight="550" ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <ObjectDataProvider x:Key="debugProvider"></ObjectDataProvider>
+    </Window.Resources>
     <Grid>
         <Label Content="Skype for Business Hybrid Health Check Tool" Margin="10,10,10,0" VerticalAlignment="Top" Height="40" FontSize="18" Foreground="White"/>
         <Image Name="picSfb" Source="sfb.png" Margin="0,10,10,0" Height="62" VerticalAlignment="Top" HorizontalAlignment="Right" Width="169"/>
@@ -20,23 +23,13 @@
                     <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,262,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="150"/>
                     <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,233,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="150"/>
                     <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,0,10,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
+                    <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,0,125,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
                 </Grid>
             </TabItem>
 
             <TabItem Name="tabResults" Header="Results">
                 <Grid>
-                    <DataGrid Name="gridResults" Margin="2,2,2,2" >
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Test Id" Binding="{Binding 'TestId'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Test Name" Binding="{Binding 'TestName'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Pass/Fail" Binding="{Binding 'TestedResult'}" Width="55" />
-                            <DataGridTextColumn Header="Expected" Binding="{Binding 'ExpectedValue'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Result" Binding="{Binding 'TestedValue'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Source Computer" Binding="{Binding 'SourceComputerName'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Destination Computer" Binding="{Binding 'DestinationComputerName'}" Width="SizeToCells" />
-                            <DataGridTextColumn Header="Message" Binding="{Binding 'TestMessage'}" Width="60" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <DataGrid Name="gridResults" Margin="2,2,2,2" ItemsSource="{Binding}" />
                 </Grid>
             </TabItem>
             <TabItem Name="tabHelp" Header="Help">
@@ -51,7 +44,12 @@
 
                 </Grid>
             </TabItem>
-
+            <TabItem Name="tabDebug" Header="Debug">
+                <Grid>
+                    <TextBlock Name="txtDebug" Margin="0,0,0,329"></TextBlock>
+                    <DataGrid Name="gridDebug" AutoGenerateColumns="True" Margin="0,78,0,0" ItemsSource="{Binding}"></DataGrid>
+                </Grid>
+            </TabItem>
         </TabControl>
         <StatusBar DockPanel.Dock="Bottom" Background="#FF0874AA" Height="34" VerticalAlignment="Bottom" >
             <StatusBar.ItemsPanel>
