@@ -2,10 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Name="MainForm" Title="Microsoft 365 FastTrack" Height="550" Width="1000" Background="#FF0874AA" MinWidth="900" MinHeight="550" ResizeMode="CanResizeWithGrip">
     <Window.Resources>
-        <ObjectDataProvider x:Key="debugProvider"></ObjectDataProvider>
+        <x:Array x:Key="resultsData" Type="sys:Object"/>
     </Window.Resources>
+
     <Grid>
         <Label Content="Skype for Business Hybrid Health Check Tool" Margin="10,10,10,0" VerticalAlignment="Top" Height="40" FontSize="18" Foreground="White"/>
         <Image Name="picSfb" Source="sfb.png" Margin="0,10,10,0" Height="62" VerticalAlignment="Top" HorizontalAlignment="Right" Width="169"/>
@@ -17,19 +19,27 @@
                     <ComboBox Name="comboVersion" Margin="0,47,10,0" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" HorizontalContentAlignment="Stretch" Width="210"/>
                     <TextBlock HorizontalAlignment="Left" Margin="29,74,0,0" TextWrapping="Wrap" Text="Forest functional level:" VerticalAlignment="Top" Height="22" Width="300"/>
                     <ComboBox Name="comboForest" Margin="0,74,10,0" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" HorizontalContentAlignment="Stretch" Width="210"/>
-                    <Label Content="Required Software"  HorizontalAlignment="Left" Height="32" Margin="10,196,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
-                    <TextBlock Name="txtOnPremModuleName" Margin="29,262,0,0" TextWrapping="Wrap" Text="Skype for Business PowerShell Module" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,235,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="300"/>
-                    <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,262,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="150"/>
-                    <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,233,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="150"/>
+                    <Label Content="Required Software"  HorizontalAlignment="Left" Height="32" Margin="10,101,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
+                    <TextBlock Name="txtOnPremModuleName" Margin="29,167,0,0" TextWrapping="Wrap" Text="Skype for Business PowerShell Module" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,138,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="300"/>
+                    <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,167,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
+                    <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,138,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
                     <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,0,10,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
                     <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,0,125,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
+
+                    <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,196,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
+                    <TextBlock Name="txtSFBOConn" Margin="29,233,0,0" TextWrapping="Wrap" Text="Skype for Business Online Connection" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
+                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="0,233,10,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Right" Width="110"/>
+
+                    <TextBlock Name="txtOverride" Margin="29,262,0,0" TextWrapping="Wrap" Text="Override admin domain" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
+                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain" Margin="0,274,10,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Right" Width="166"/>
+
                 </Grid>
             </TabItem>
 
             <TabItem Name="tabResults" Header="Results">
                 <Grid>
-                    <DataGrid Name="gridResults" Margin="2,2,2,2" ItemsSource="{Binding}" />
+                    <DataGrid Name="gridResults" Margin="2,2,2,2" ItemsSource="{DynamicResource resultsData}" CanUserAddRows="True" AlternatingRowBackground="SkyBlue" AlternationCount="2"/>
                 </Grid>
             </TabItem>
             <TabItem Name="tabHelp" Header="Help">
