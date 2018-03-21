@@ -24,15 +24,17 @@
                     <TextBlock HorizontalAlignment="Left" Margin="29,138,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="300"/>
                     <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,167,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
                     <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,138,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
-                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,0,10,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
-                    <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,0,125,10" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
+                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,0,10,29" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
+                    <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,0,10,116" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
 
                     <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,196,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
-                    <TextBlock Name="txtSFBOConn" Margin="29,233,0,0" TextWrapping="Wrap" Text="Skype for Business Online Connection" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
-                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="0,233,10,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Right" Width="110"/>
+                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="122,320,0,0" Height="24" HorizontalAlignment="Left" Width="100" VerticalAlignment="Top"/>
+                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,233,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="927"/>
+                    <TextBox Name="txtUsername" HorizontalAlignment="Left" Height="24" Margin="122,262,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="180"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,262,0,0" TextWrapping="Wrap" Text="Username:" VerticalAlignment="Top" Height="24"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,291,0,0" TextWrapping="Wrap" Text="Password:" VerticalAlignment="Top" Height="24" Width="56"/>
+                    <PasswordBox Name="txtPassword" HorizontalAlignment="Left" Margin="122,291,0,0" VerticalAlignment="Top" Width="179" Height="24"/>
 
-                    <TextBlock Name="txtOverride" Margin="29,262,0,0" TextWrapping="Wrap" Text="Override admin domain" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
-                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain" Margin="0,274,10,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Right" Width="166"/>
 
                 </Grid>
             </TabItem>

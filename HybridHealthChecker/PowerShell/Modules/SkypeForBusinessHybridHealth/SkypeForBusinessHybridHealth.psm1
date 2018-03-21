@@ -1,4 +1,3 @@
-#CLASSES#
 
 
 function Get-SkypeForBusinessHybridHealth{
@@ -53,18 +52,22 @@ function Get-SkypeForBusinessHybridHealth{
 
 function Invoke-SkypeForBusinessHybridHealthCheck {
     [CmdletBinding()]
- 
+
     #create runspace for multithreading
     $Global:uiHash = [hashtable]::Synchronized(@{})
-    $uiHash.Add("resultsHash",$null)
-    $variableHash = [hashtable]::Synchronized(@{})
 
-    $variableHash.Add('2013Tools', "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx")
-    $variableHash.Add('2015Tools', "https://technet.microsoft.com/en-ca/library/dn933921.aspx")
-    $variableHash.Add('SFBOTools', "https://www.microsoft.com/en-us/download/details.aspx?id=39366")
-    $variableHash.Add('xmlWPF', (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml"))
+    $uiHash.resultsHash = $null
+    $uiHash.testRunning = $false
 
-    #create runspace and add hash tables as variables to it
+    $Global:variableHash = [hashtable]::Synchronized(@{})
+
+    $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
+    $variableHash.SfbTools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
+    $variableHash.SfbOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
+    $variableHash.xmlWPF = (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml")
+    $variableHash.moduleLocation = "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\SkypeForBusinessHybridHealth.psm1"
+    
+    #create UI runspace
     $newRunspace =[runspacefactory]::CreateRunspace()
     $newRunspace.ApartmentState = "STA"
     $newRunspace.ThreadOptions = "ReuseThread"
@@ -108,12 +111,12 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
 #region EVENTS#
 
+        #can I put this in the event below??
         $updateBlock = {
             $uiHash.Window.Resources["resultsData"] = $uiHash.resultsHash
         }
 
         $uiHash.Window.Add_SourceInitialized( {
-
 
             FormFirstRun
             FormCheckModules($uiHash.comboVersion.SelectedValue)
@@ -121,14 +124,11 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
             if ((!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))){
                 $uiHash.btnConnect.IsEnabled = $true
             }
-
             
-            $timer = new-object System.Windows.Threading.DispatcherTimer            
-            ## Which will fire 1 times every second            
-            $timer.Interval = [TimeSpan]"0:0:0:0.10"            
-            ## And will invoke the $updateBlock            
-            $timer.Add_Tick($updateBlock)            
-            ## Now start the timer running            
+            ## Create timer to handle updating the grid
+            $timer = new-object System.Windows.Threading.DispatcherTimer
+            $timer.Interval = [TimeSpan]"0:0:0:0.10"
+            $timer.Add_Tick($updateBlock)
             $timer.Start()
         } )
 
@@ -164,15 +164,15 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
             $uiHash.btnAdminInstalled.Add_Click(
                 {
                     switch ($uiHash.comboVersion.SelectedValue) {
-                        "Skype for Business Server 2015" { Start-Process $variableHash['2015Tools'] }
-                        "Lync Server 2013" { Start-Process $variableHash['2013Tools'] }
+                        "Skype for Business Server 2015" { Start-Process $variableHash['SfbTools'] }
+                        "Lync Server 2013" { Start-Process $variableHash['LyncTools'] }
                     }
                 }
             )
 
             $uiHash.btnSFBOAdminInstalled.Add_Click(
                 {
-                    Start-Process $variableHash['SFBOTools']
+                    Start-Process $variableHash['SfbOTools']
                 }
             )
 
@@ -191,7 +191,7 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
             $uiHash.btnStartTests.Add_Click(
                 {
                     #clear previous test results
-                    $uiHash.resultHash = $null
+                    $uiHash.resultsHash = $null
 
                     #display progress bar
                     $uiHash.barStatus.Visibility = "Visible"
@@ -202,9 +202,31 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                     $uiHash.tabMain.SelectedIndex = 1
 
                     #start first test (need a runspace for this)
-                    GetForestData
-                    GetCmsReplicationStatus
-                    GetAccessEdgeConfiguration
+                    $codeBlock = {
+                        #disable start button
+                        $uiHash.btnStartTests.IsEnabled = $false
+
+                        #need to import the module into this runspace
+                        #Import-Module $variableHash.moduleLocation -Force
+                        Import-Module "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\SkypeForBusinessHybridHealth.psm1" -Force
+                        $uiHash.ModuleFound = if (Get-Module SkypeForBusinessHybridHealth){$true}else{$false}
+                        $uiHash.CodeBlockError = $Error
+                        
+                        #test execution
+                        GetForestData
+                        GetCmsReplicationStatus
+                        GetAccessEdgeConfiguration
+
+                        #re-enable the button :)
+                        $uiHash.btnStartTests.IsEnabled = $true
+                    }
+
+                    StartTestsInRunspace($codeBlock)
+
+                    #do {
+                    #    $uiHash.txtStatus1.Text = "Running tests..."
+
+                    #} until ($uiHash.TestingHandle.IsCompleted -eq $true)
 
                     #wrap it up
                     $uiHash.txtStatus1.Text = "Finished"
@@ -221,14 +243,32 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
         )
 
     $psCmd.Runspace = $newRunspace
-    $uiHandle = $psCmd.BeginInvoke()
-
-
-
-        return $uiHash
+    $uiHash.uiHandle = $psCmd.BeginInvoke()
+    
+    return $uiHash
 }
 
 # INTERNAL FUNCTIONS #
+
+function StartTestsInRunspace {
+    [cmdletbinding()]
+    param($codeBlock)
+
+    $testingRunspace = [runspacefactory]::CreateRunspace()
+    $testingRunspace.ApartmentState = "STA"
+    $testingRunspace.ThreadOptions = "ReuseThread"
+    $testingRunspace.Open()
+    $testingRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
+    $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
+    $testingCmd = [PowerShell]::Create().AddScript($codeBlock)
+    $testingCmd.Runspace = $testingRunspace
+    $testingHandle = $testingCmd.BeginInvoke()
+
+    #store the handle in the global sync'd hashtable
+    $uiHash.testingHandle = $testingHandle
+
+
+}
 function FormCheckModules ($ModuleName) {
     #detect modules for on-prem pieces
     switch ($ModuleName) {
@@ -270,31 +310,31 @@ function InstallAdminTools ($Version) {
     $binPath = (get-module SkypeForBusinessHybridHealth).modulebase + "\bin"
     switch ($Version) {
         "Lync Server 2013" {
-            $2013Tools = $binPath + "\2013\"
+            $LyncTools = $binPath + "\2013\"
 
             $SFBtxtStatus1.Text = "Installing Visual C++ Redistributable..."
-            $vcInstall = Start-Process -FilePath ($2013Tools + "vcredist_x64.exe") -ArgumentList "/install /passive /norestart" -Wait
+            $vcInstall = Start-Process -FilePath ($LyncTools + "vcredist_x64.exe") -ArgumentList "/install /passive /norestart" -Wait
             $SFBbarStatus.Value = "20"
 
             $SFBtxtStatus1.Text = "Installing SQL CLR Types..."
-            $clrInstall = Start-Process -FilePath ($2013Tools + "SQLSysClrTypes.msi") -ArgumentList "/qr" -Wait
+            $clrInstall = Start-Process -FilePath ($LyncTools + "SQLSysClrTypes.msi") -ArgumentList "/qr" -Wait
             $SFBbarStatus.Value = "40"
 
             $SFBtxtStatus1.Text = "Installing SQL Shared Management Objects..."
-            $smoInstall = Start-Process -FilePath ($2013Tools + "SharedManagementObjects.msi") -ArgumentList "/qr" -Wait
+            $smoInstall = Start-Process -FilePath ($LyncTools + "SharedManagementObjects.msi") -ArgumentList "/qr" -Wait
             $SFBbarStatus.Value = "60"
             
             $SFBtxtStatus1.Text = "Installing OCSCORE.msi..."
-            $ocsInstall = Start-Process -FilePath ($2013Tools + "ocscore.msi") -ArgumentList "/qr" -Wait
+            $ocsInstall = Start-Process -FilePath ($LyncTools + "ocscore.msi") -ArgumentList "/qr" -Wait
             $SFBbarStatus.Value = "80"
             
             $SFBtxtStatus1.Text = "Installing Visual C++ Redistributable..."
-            $adminInstall = Start-Process -FilePath ($2013Tools + "admintools.msi") -ArgumentList "/qr" -Wait
+            $adminInstall = Start-Process -FilePath ($LyncTools + "admintools.msi") -ArgumentList "/qr" -Wait
             $SFBbarStatus.Value = "100"
             
           }
         "Skype for Business Server 2015" {
-            $2015Tools = $binPath + "\2015\"
+            $SfbTools = $binPath + "\2015\"
         }
     }
 }
@@ -565,9 +605,7 @@ function ProcessResult{
             'Message' = $testMessage
             'Source Computer' = $sourceComputerName
             'Destination Computer' = $destinationComputerName
-            #ErrorMessage = $(if ($testExpectedValue -ne $testValue){$testErrorMessage}else{$testErrorMessage = $null})
-            #SuccessMessage = $(if ($testExpectedValue -eq $testValue){$testSuccessMessage}else{$testSuccessMessage = $null})
-            TestDate = $(Get-Date)
+            'Test Date' = $(Get-Date)
         }
     }
     end {
