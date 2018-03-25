@@ -3,45 +3,57 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        Name="MainForm" Title="Microsoft 365 FastTrack" Height="550" Width="1000" Background="#FF0874AA" MinWidth="900" MinHeight="550" ResizeMode="CanResizeWithGrip">
+        
+        Name="MainForm" Title="Microsoft 365 FastTrack" Height="600" Width="900" Background="#FF0874AA" MinWidth="900" MinHeight="600" ResizeMode="CanResizeWithGrip">
     <Window.Resources>
         <x:Array x:Key="resultsData" Type="sys:Object"/>
     </Window.Resources>
 
     <Grid>
         <Label Content="Skype for Business Hybrid Health Check Tool" Margin="10,10,10,0" VerticalAlignment="Top" Height="40" FontSize="18" Foreground="White"/>
-        <Image Name="picSfb" Source="sfb.png" Margin="0,10,10,0" Height="62" VerticalAlignment="Top" HorizontalAlignment="Right" Width="169"/>
+        <Image Name="picSfb" Source="C:\Users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\sfb.png" Margin="0,10,24,0" VerticalAlignment="Top" HorizontalAlignment="Right" Width="50"/>
         <TabControl Name="tabMain" Margin="10,55,10,34">
             <TabItem Name="tabConfiguration" Header="Configuration">
-                <Grid>
-                    <Label Content="On-Premises Configuration"  HorizontalAlignment="Left" Height="32" Margin="10,10,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,47,0,0" TextWrapping="Wrap" Text="On-premises version:" VerticalAlignment="Top" Height="22" Width="300"/>
-                    <ComboBox Name="comboVersion" Margin="0,47,10,0" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" HorizontalContentAlignment="Stretch" Width="210"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,74,0,0" TextWrapping="Wrap" Text="Forest functional level:" VerticalAlignment="Top" Height="22" Width="300"/>
-                    <ComboBox Name="comboForest" Margin="0,74,10,0" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" HorizontalContentAlignment="Stretch" Width="210"/>
-                    <Label Content="Required Software"  HorizontalAlignment="Left" Height="32" Margin="10,101,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
-                    <TextBlock Name="txtOnPremModuleName" Margin="29,167,0,0" TextWrapping="Wrap" Text="Skype for Business PowerShell Module" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="300"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,138,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="300"/>
-                    <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,167,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
-                    <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,138,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
-                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,0,10,29" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
-                    <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,0,10,116" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="110" Height="24"/>
+                <Grid Margin="0,-26,0,0">
+                    <Label Content="On-Premises Configuration"  HorizontalAlignment="Left" Height="32" Margin="10,42,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,79,0,0" TextWrapping="Wrap" Text="On-premises version:" VerticalAlignment="Top" Height="22" Width="129"/>
+                    <ComboBox Name="comboVersion" Margin="163,79,0,0" Height="22" VerticalAlignment="Top" HorizontalContentAlignment="Stretch" HorizontalAlignment="Left" Width="210"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,106,0,0" TextWrapping="Wrap" Text="Forest functional level:" VerticalAlignment="Top" Height="22" Width="129"/>
+                    <ComboBox Name="comboForest" Margin="163,106,0,0" Height="22" VerticalAlignment="Top" HorizontalContentAlignment="Stretch" HorizontalAlignment="Left" Width="210"/>
+                    <Label Content="Required Software" HorizontalAlignment="Left" Height="32" Margin="10,133,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
+                    <TextBlock Name="txtOnPremModuleName" Margin="29,199,0,0" TextWrapping="Wrap" Text="Skype for Business PowerShell Module" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="374" Foreground="Black"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,170,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="374" Foreground="Black"/>
 
-                    <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,196,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
-                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="122,320,0,0" Height="24" HorizontalAlignment="Left" Width="100" VerticalAlignment="Top"/>
-                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,233,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="927"/>
-                    <TextBox Name="txtUsername" HorizontalAlignment="Left" Height="24" Margin="122,262,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="180"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,262,0,0" TextWrapping="Wrap" Text="Username:" VerticalAlignment="Top" Height="24"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,291,0,0" TextWrapping="Wrap" Text="Password:" VerticalAlignment="Top" Height="24" Width="56"/>
-                    <PasswordBox Name="txtPassword" HorizontalAlignment="Left" Margin="122,291,0,0" VerticalAlignment="Top" Width="179" Height="24"/>
+                    <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,228,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
+                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="163,375,0,0" Height="24" HorizontalAlignment="Left" Width="80" VerticalAlignment="Top"/>
+                    <Button Name="btnDisconnect" Content="Disconnect" IsEnabled="False" HorizontalAlignment="Left" Margin="293,375,0,0" VerticalAlignment="Top" Width="80" Height="24"/>
+                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,265,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="486"/>
 
+                    <TextBlock HorizontalAlignment="Left" Margin="29,294,0,0" TextWrapping="Wrap" Text="Tenant domain name:" VerticalAlignment="Top" Height="24" Width="129"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="308,294,0,0" TextWrapping="Wrap" Text=".onmicrosoft.com" VerticalAlignment="Top" Height="24" Width="125"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,321,0,0" TextWrapping="Wrap" Text="Username:" VerticalAlignment="Top" Height="24" Width="129"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="19,321,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,348,0,0" TextWrapping="Wrap" Text="Password:" VerticalAlignment="Top" Height="24" Width="129"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="19,348,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
+
+                    <TextBox Name="txtTenantDomain" HorizontalAlignment="Left" Height="22" Margin="163,294,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="140" />
+                    <TextBox Name="txtUsername" HorizontalAlignment="Left" Height="22" Margin="163,321,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="210"/>
+                    <PasswordBox Name="txtPassword" HorizontalAlignment="Left" Margin="163,348,0,0" VerticalAlignment="Top" Width="210" Height="22"/>
+
+                    <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,170,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
+                    <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,199,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="110"/>
+                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,375,10,0" HorizontalAlignment="Right" Width="110" Height="24" VerticalAlignment="Top"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="19,294,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,404,0,0" TextWrapping="Wrap" Text="Status:" VerticalAlignment="Top"/>
+                    <TextBlock Name="txtSfboStatus" Text="You must provide the required information to connect to Skype for Business Online." Margin="193,404,10,10" TextWrapping="Wrap" Foreground="Black"/>
+                    <TextBlock Name="txtUserNotify" HorizontalAlignment="Left" Margin="378,323,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Height="20" Width="478" Foreground="Black"/>
 
                 </Grid>
             </TabItem>
 
             <TabItem Name="tabResults" Header="Results">
                 <Grid>
-                    <DataGrid Name="gridResults" Margin="2,2,2,2" ItemsSource="{DynamicResource resultsData}" CanUserAddRows="True" AlternatingRowBackground="SkyBlue" AlternationCount="2"/>
+                    <DataGrid Name="gridResults" Margin="2,2,2,2" ItemsSource="{DynamicResource resultsData}" IsReadOnly="True" CanUserAddRows="False" AlternatingRowBackground="SkyBlue" AlternationCount="2"/>
                 </Grid>
             </TabItem>
             <TabItem Name="tabHelp" Header="Help">
@@ -49,15 +61,15 @@
                     <Label Content="Tool Information"  HorizontalAlignment="Left" Height="32" Margin="10,10,0,0" VerticalAlignment="Top" Width="748" FontSize="16"/>
                     <TextBlock HorizontalAlignment="Left" Margin="29,47,0,0" TextWrapping="Wrap" Text="Version:" VerticalAlignment="Top" Height="22" Width="300"/>
                     <TextBlock Name="txtVersion" Margin="0,47,10,0" TextWrapping="Wrap" Text="[version]" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" TextAlignment="Right" Width="226"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,74,0,0" TextWrapping="Wrap" Text="Feedback:" VerticalAlignment="Top" Height="22" Width="300"/>
-                    <TextBlock Name="txtFeedback" Margin="0,74,10,0" TextWrapping="Wrap" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" TextAlignment="Right" Width="226"><Hyperlink Name="navFeedback" NavigateUri="mailto:jason.shave@microsoft.com">Send email</Hyperlink></TextBlock>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,101,0,0" TextWrapping="Wrap" Text="Code source:" VerticalAlignment="Top" Height="22" Width="300"/>
-                    <TextBlock Name="txtGitHubSource" Margin="0,101,10,0" TextWrapping="Wrap" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" TextAlignment="Right" Width="417"><Hyperlink Name="navGitHub" NavigateUri="https://github.com/jasonshave/HybridHealthChecker">https://github.com/jasonshave/HybridHealthChecker</Hyperlink></TextBlock>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,74,0,0" TextWrapping="Wrap" Text="Source code:" VerticalAlignment="Top" Height="22" Width="300"/>
+                    <TextBlock Name="txtGitHubSource" Margin="0,74,10,0" TextWrapping="Wrap" Height="22" VerticalAlignment="Top" HorizontalAlignment="Right" TextAlignment="Right" Width="417"><Hyperlink Name="navGitHub" NavigateUri="https://github.com/jasonshave/HybridHealthChecker">https://github.com/jasonshave/HybridHealthChecker</Hyperlink></TextBlock>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,101,0,0" TextWrapping="Wrap" Text="NOTE: Accounts enabled for MFA are not supported by this tool at this time." VerticalAlignment="Top" Width="927" Height="209"/>
 
                 </Grid>
             </TabItem>
-            <TabItem Name="tabDebug" Header="Debug">
+            <TabItem Name="tabDebug" Header="Debug" Visibility="Hidden">
                 <Grid>
+                    <Button Name="btnStartDebug" IsEnabled="true" Content="Start Debug" Margin="0,10,10,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Right" Width="110"/>
                     <TextBlock Name="txtDebug" Margin="0,0,0,329"></TextBlock>
                     <DataGrid Name="gridDebug" AutoGenerateColumns="True" Margin="0,78,0,0" ItemsSource="{Binding}"></DataGrid>
                 </Grid>
@@ -72,18 +84,16 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="4*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                     </Grid>
                 </ItemsPanelTemplate>
             </StatusBar.ItemsPanel>
             <StatusBarItem>
-                <TextBlock Name="txtStatus1" Foreground="White" Width="462" Margin="10,0,0,0">Ready</TextBlock>
+                <TextBlock Name="txtStatus1" Foreground="White" Width="774" Margin="10,0,0,0" TextWrapping="NoWrap">Ready</TextBlock>
             </StatusBarItem>
             <StatusBarItem Grid.Column="1">
-                <ProgressBar Name="barStatus" Value="0" Width="80" Height="18" Visibility="Hidden"/>
+                <ProgressBar Name="barStatus" Visibility="Visible" Value="0" Width="110" Height="15" Margin="40,0,0,0"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>
