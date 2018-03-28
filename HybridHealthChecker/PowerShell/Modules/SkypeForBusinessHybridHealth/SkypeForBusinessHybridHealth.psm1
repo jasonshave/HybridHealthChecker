@@ -6,12 +6,15 @@ function Get-SkypeForBusinessHybridHealth {
 function Invoke-SkypeForBusinessHybridHealthCheck {
     [CmdletBinding()]
 
-    #create runspace for multithreading
+    #create runspace for variable handling through each runspace
     $Global:uiHash = [hashtable]::Synchronized(@{})
-    $Global:variableHash = [hashtable]::Synchronized(@{})
+
     $uiHash.resultsHash = $null
-    $uiHash.testRunning = $false
     $uiHash.uiHost = $Host
+    $uiHash.Jobs = [System.Collections.ArrayList]@()
+
+    $Global:variableHash = [hashtable]::Synchronized(@{})
+
     $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
     $variableHash.SfbTools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
     $variableHash.SfbOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
@@ -25,13 +28,13 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
         $variableHash.($moduleName) = Get-Module $moduleName
     }
     
-    #create UI runspace
-    $newRunspace =[runspacefactory]::CreateRunspace()
-    $newRunspace.ApartmentState = "STA"
-    $newRunspace.ThreadOptions = "ReuseThread"
-    $newRunspace.Open()
-    $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
-    $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
+    #create UI runspace POOL
+    $pool =[runspacefactory]::CreateRunspacePool(1, [int]$env:NUMBER_OF_PROCESSORS + 1)
+    $pool.ApartmentState = "STA"
+    $pool.ThreadOptions = "ReuseThread"
+    $pool.Open()
+    $pool.SessionStateProxy.SetVariable("uiHash",$uiHash)
+    $pool.SessionStateProxy.SetVariable("variableHash",$variableHash)
 
     $psCmd = [PowerShell]::Create().AddScript({
         #need this for the XAML/WPF bits
@@ -266,9 +269,11 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     })
 
     Write-Host "Creating runspace for script..."
-    $psCmd.Runspace = $newRunspace
+    $psCmd.RunspacePool = $pool
+    $psCmd.Name = "RspMainUi"
     Write-Host "Starting UI..." -ForegroundColor Green
-    $uiHash.uiHandle = $psCmd.BeginInvoke()
+    $uiHash.Jobs
+    $psCmd.BeginInvoke()
     
 }
 
