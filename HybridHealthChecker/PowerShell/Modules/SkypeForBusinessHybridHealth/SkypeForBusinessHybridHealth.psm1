@@ -11,8 +11,7 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
     $uiHash.resultsHash = $null
     $uiHash.uiHost = $Host
-    $uiHash.Jobs = [System.Collections.ArrayList]@()
-
+    
     $Global:variableHash = [hashtable]::Synchronized(@{})
 
     $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
@@ -28,13 +27,13 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
         $variableHash.($moduleName) = Get-Module $moduleName
     }
     
-    #create UI runspace POOL
-    $pool =[runspacefactory]::CreateRunspacePool(1, [int]$env:NUMBER_OF_PROCESSORS + 1)
-    $pool.ApartmentState = "STA"
-    $pool.ThreadOptions = "ReuseThread"
-    $pool.Open()
-    $pool.SessionStateProxy.SetVariable("uiHash",$uiHash)
-    $pool.SessionStateProxy.SetVariable("variableHash",$variableHash)
+    #create UI runspace 
+    $newRunspace =[runspacefactory]::CreateRunspace()
+    $newRunspace.ApartmentState = "STA"
+    $newRunspace.ThreadOptions = "ReuseThread"
+    $newRunspace.Open()
+    $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
+    $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
 
     $psCmd = [PowerShell]::Create().AddScript({
         #need this for the XAML/WPF bits
@@ -269,11 +268,9 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     })
 
     Write-Host "Creating runspace for script..."
-    $psCmd.RunspacePool = $pool
-    $psCmd.Name = "RspMainUi"
+    $psCmd.Runspace = $newRunspace
     Write-Host "Starting UI..." -ForegroundColor Green
-    $uiHash.Jobs
-    $psCmd.BeginInvoke()
+    $uiHash.RspMainUi = $psCmd.BeginInvoke()
     
 }
 
