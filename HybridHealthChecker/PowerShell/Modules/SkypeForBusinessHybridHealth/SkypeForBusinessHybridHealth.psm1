@@ -124,12 +124,11 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         if ([string]::IsNullOrEmpty($uiHash.Password) -and [string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText) -and (!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))) {
                             $uiHash.btnStartTests.IsEnabled = $true
                         }
-
                     }
 
                     # Create timer to handle updating the grid
                     $timer = new-object System.Windows.Threading.DispatcherTimer
-                    $timer.Interval = [TimeSpan]"0:0:0:0.10"
+                    $timer.Interval = [TimeSpan]"0:0:0:0.30"
                     $timer.Add_Tick($updateBlock)
                     $timer.Start()
                 }
@@ -639,44 +638,20 @@ function TestFEToEdgePorts {
         #note: we don't do a Get-CsService -Registrar here because we want the associated FE's for all Edge servers. Some FE's might not have an Edge association defined.
         [array]$poolServers = (((Get-CsService -EdgeServer).DependentServiceList) | Where-Object {$_ -like "Registrar:*"}).Replace("Registrar:","")
         $registrarServers = ($poolServers | ForEach-Object {Get-CsPool -Identity $_}).Computers
-        [array]$frontEndToEdgePorts = "443,4443,5061,5062,8057,50001,50002,50003"
+        [array]$frontEndToEdgePorts = 443,4443,5061,5062,8057,50001,50002,50003
 
         $edgeServerTestResults = TestTcpPortConnection -Ports $frontEndToEdgePorts -Source $registrarServers -Destination $edgeServers
         $edgeServerTestResults | ForEach-Object {
+
             if ($_.TestResult -eq "Connected") {
                 #success; write it out
                 $testMessage = "Successfully connected to {0} from {1} on port {2}." -f $_.Destination, $_.Source, $_.Port
             } else {
-                $testMessage = "Unable to establish TCP connection from {0} to {1} on {3}:" -f $_.Source, $_.Destination, $_.Port
+                $testMessage = "Unable to establish TCP connection from {0} to {1} on {2}." -f $_.Source, $_.Destination, $_.Port
             }
             
             ProcessResult -testId $testId -testName TestFEtoEdgePorts -sourceComputerName $_.PSComputerName -destinationComputerName $_.Destination -testMessage $testMessage -testValue $_.TestResult -testExpectedValue "Connected"
         }
-}
-
-function CompareFederationBetweenOnlineOnPrem {
-    [cmdletbinding()]
-    param(
-
-    )
-    begin {
-        #make sure SFBO connection is established
-        $session = Get-PSSession | Where-Object {$_.ComputerName -like "*online.lync.com" -and $_.State -eq "Opened" -and $_.Availability -eq "Available"} -ErrorAction SilentlyContinue
-        if (!$session) {
-            return ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.NoSfboConnection
-        }
-    }
-    process {
-        if (!($fedResult = Get-SfboCsTenantFederationConfiguration).AllowFederatedUsers) {
-            #federation is turned off in the tenant
-            return ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.CompareFederationSettingsOnlineFedError -testExpectedValue $resources.CompareFederationSettingsAllowFed -testValue $fedResult.AllowFederatedUsers
-        } else {
-            ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testSuccessMessage $resources.CompareFederationSettingsSuccessMessage -testExpectedValue $resources.CompareFederationSettingsAllowFed -testValue $fedResult.AllowFederatedUsers
-        }
-
-    }
-    end {}
-
 }
 
 function TestTcpPortConnection{
@@ -699,6 +674,7 @@ function TestTcpPortConnection{
             }
             ForEach ($p in $Ports) {
                 try {
+                    $uiHash.Status = "Testing TCP connection from Front-End servers to {0} using port {1}..." -f $d, $p
                     [array]$portTestResult += Invoke-Command -ScriptBlock {
                         $Socket = New-Object System.Net.Sockets.TCPClient;
                         $Connection = $Socket.BeginConnect($args[0],$args[1],$null,$null);
@@ -814,16 +790,13 @@ function GetTenantInfo {
             $webEx = ($Error[0].Exception.InnerException) -as [System.Net.WebException]
             if (($webEx -ne $null) -and ($webEx.Status -eq [System.Net.WebExceptionStatus]::ProtocolError)){
                 $uiHash.Status = "Domain $TenantDomain is not registired with ACS/O365"
-                $uiHash.StatusColor = "Red"
                 return;
             } else {
                 $uiHash.Status = "There was an exception getting the URL for the admin domain in Office 365!"
-                $uiHash.StatusColor = "Red"
                 return;
             }
         }catch{
             $uiHash.Status = "There was an exception getting the URL for the admin domain in Office 365!"
-            $uiHash.StatusColor = "Red"
             return;
         }
 
