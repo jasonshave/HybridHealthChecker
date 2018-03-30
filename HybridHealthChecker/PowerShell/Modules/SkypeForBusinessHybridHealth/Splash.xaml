@@ -5,9 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HybridHealthChecker.PowerShell.Modules.SkypeForBusinessHybridHealth"
         mc:Ignorable="d"
-        Title="Microsoft 365 - FastTrack" Height="250" Width="450">
-    <Grid>
-        <TextBlock HorizontalAlignment="Center" Margin="0,109,0,93" TextWrapping="Wrap" Text="Loading..." VerticalAlignment="Center" Height="17" Width="442" TextAlignment="Center"/>
+        Title="Microsoft 365 - FastTrack" Height="250" Width="450" WindowStyle="None" ResizeMode="NoResize" HorizontalAlignment="Center" VerticalAlignment="Center" WindowStartupLocation="CenterScreen">
+    <Grid Background="#FF00AFF0">
+        <TextBlock HorizontalAlignment="Center" Margin="4,179,4,54" TextWrapping="Wrap" Text="Loading Hybrid Health Check Tool..." VerticalAlignment="Center" Height="17" Width="442" TextAlignment="Center"/>
+        <Image Name="picSplash1" HorizontalAlignment="Left" Height="98" Margin="10,44,0,0" VerticalAlignment="Top" Width="430" Source=".\Skype_for_Business_Logo.png" Stretch="UniformToFill"/>
+        <Grid HorizontalAlignment="Left" Height="230" Margin="10,10,0,0" VerticalAlignment="Top" Width="430" Background="White" Panel.ZIndex="-1"/>
 
     </Grid>
 </Window>

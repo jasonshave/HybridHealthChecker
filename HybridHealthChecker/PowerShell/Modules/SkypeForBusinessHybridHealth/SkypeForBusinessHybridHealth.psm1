@@ -1,12 +1,11 @@
 function Get-SkypeForBusinessHybridHealth {
-    Write-Host "This command has been deprecated. Starting new command: Invoke-SkypeForBusinessHybridHealthCheck"
+    Write-Host -ForegroundColor Green "This command has been deprecated. Starting new command: Invoke-SkypeForBusinessHybridHealthCheck"
     Invoke-SkypeForBusinessHybridHealthCheck
 }
 
 function Invoke-SkypeForBusinessHybridHealthCheck {
     [CmdletBinding()]
 
-    #create runspace for variable handling through each runspace
     $Global:uiHash = [hashtable]::Synchronized(@{})
 
     $uiHash.resultsHash = $null
@@ -17,36 +16,59 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
     $variableHash.SfbTools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
     $variableHash.SfbOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
-    $variableHash.xmlWPF = (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml")
-    
-    #discover installed modules
+    $variableHash.rootPath = Split-Path (Get-module SkypeForBusinessHybridHealth).path
     $variableHash.requiredModules = @("SkypeOnlineConnector","SkypeForBusiness","Lync")
 
     foreach ($moduleName in $variableHash.requiredModules) {
-        Write-Host "Attempting to locate PowerShell module: $moduleName"
         $variableHash.($moduleName) = Get-Module $moduleName
     }
     
-    #create UI runspace 
-    $newRunspace =[runspacefactory]::CreateRunspace()
-    $newRunspace.ApartmentState = "STA"
-    $newRunspace.ThreadOptions = "ReuseThread"
-    $newRunspace.Open()
-    $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
-    $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
-
-    $psCmd = [PowerShell]::Create().AddScript({
+    #DISPLAY SPLASH#
+    $splashBlock = {
         #need this for the XAML/WPF bits
-        $uiHash.uiHost.Write("Adding PresentationFramework assembly...")
         Add-Type -AssemblyName PresentationFramework
 
-        #parse XAML name tags into hash table
-        $uiHash.uiHost.Write("Parsing XAML content...")
-        [xml]$xAML = $variableHash.xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+        $uiContent = Get-Content -Path ($variableHash.rootPath + "\Splash.xaml")
+        
+        [xml]$xAML = $uiContent -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
+        $uiHash.Splash = [Windows.Markup.XamlReader]::Load($xmlReader)
+
+        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
+            $uiHash.Add($_.Name, $uiHash.Splash.FindName($_.Name))
+        }
+
+        #region EVENTS#
+
+            $uiHash.Splash.Add_SourceInitialized(
+                {
+                    $uiHash.picSplash1.Source = ($variableHash.rootPath + "\Skype_for_Business_Logo.png")
+                }
+            )
+
+            $uiHash.Splash.Add_MouseRightButtonDown(
+                {
+                    $uiHash.Splash.Close()
+                }
+            )
+        #end region EVENTS#
+
+        $uiHash.Splash.ShowDialog() | Out-Null
+    }
+
+    Invoke-NewRunspace -codeBlock $splashBlock -RunspaceHandleName RspSplashScreen
+
+    #DISPLAY MAIN WINDOW#
+    $mainWindow = {
+        #need this for the XAML/WPF bits
+        Add-Type -AssemblyName PresentationFramework
+        
+        $uiContent = Get-Content -Path ($variableHash.rootPath + "\MainWindow.xaml")
+        
+        [xml]$xAML = $uiContent -replace 'mc:Ignorable="d"','' -replace "x:N",'N' -replace '^<Win.*', '<Window'
         $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
         $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
 
-        #populate uiHash with XAML name tags so we can reference them in code (i.e. btnButton = $uiHash.btnButton.Add_Click)
         $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
             $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
         }
@@ -55,20 +77,17 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
             $uiHash.Window.Add_SourceInitialized(
                 {
+                    $uiHash.picSfb.Source = ($variableHash.rootPath + "\sfb.png")
+                    $uiHash.Window.Icon = ($variableHash.rootPath + "\sfb.png")
                     $uiHash.txtVersion.Text = ((Get-Module SkypeForBusinessHybridHealth).Version).toString()
+
                     $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
                     $uiHash.comboVersion.SelectedIndex = 0
-
                     $uiHash.comboForest.ItemsSource = @("Windows 2016 Forest","Windows 2012 R2 Forest","Windows 2012 Forest","Windows 2008 R2 Forest","Windows 2008 Forest")
                     $uiHash.comboForest.SelectedIndex = 0
 
-                    #for some reason we can't pull the value of this combobox without setting it to another hash variable here :(
                     $uiHash.ComboForestSelectedValue = $uiHash.comboForest.SelectedValue -replace '\s',''
-
-                    #initial read of this value; we will update the hash variable on a change event for this object!
                     $uiHash.ComboVersionSelectedValue = $uiHash.comboVersion.SelectedValue
-
-                    FormCheckModules
 
                     $uiHash.Status = "Ready"
                     $uiHash.StatusColor = "White"
@@ -77,36 +96,34 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                     $uiHash.SfboStatusText = "You must provide the required information to connect to Skype for Business Online."
                     $uiHash.AdminDomainIsChecked = $false
                     $uiHash.OnPremModuleNameText = "Skype for Business PowerShell Module"
-                    
+
+                    Invoke-CheckModules
+
                     $updateBlock = {
                         #update the results grid with our data via XAML binding attribute called "resultsData"
                         $uiHash.Window.Resources["resultsData"] = $uiHash.resultsHash
 
-                        #update the status bar text
-                        $uiHash.txtStatus1.Text = $uiHash.Status
-                        $uiHash.txtStatus1.Foreground = $uiHash.StatusColor
-
-                        #update other page elements
+                        #update status bar
                         $uiHash.barStatus.Value = $uiHash.ProgressBarStatus
                         $uiHash.barStatus.Visibility = $uiHash.ProgressBarVisibility
 
-                        $uiHash.btnConnect.IsEnabled = $uiHash.ConnectIsEnabled
-
+                        #update text blocks
+                        $uiHash.txtStatus1.Text = $uiHash.Status
+                        $uiHash.txtStatus1.Foreground = $uiHash.StatusColor
                         $uiHash.txtSfboStatus.Text = $uiHash.SfboStatusText
-
                         $uiHash.txtUserNotify.Text = $uiHash.UserNotifyText
-
-                        $uiHash.btnAdminInstalled.IsEnabled = $uiHash.AdminInstalledIsEnabled
-                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $uiHash.SFBOAdminInstalledIsEnabled
-
                         $uiHash.txtOnPremModuleName.Text = $uiHash.OnPremModuleNameText
+
+                        #update buttons
+                        $uiHash.btnConnect.IsEnabled = $uiHash.ConnectIsEnabled
+                        $uiHash.btnAdminInstalled.IsEnabled = $uiHash.AdminInstalledIsEnabled
+                        $uiHash.btnAdminInstalled.Content = $uiHash.AdminInstalledContent
+                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $uiHash.SFBOAdminInstalledIsEnabled
 
 
                         if ([string]::IsNullOrEmpty($uiHash.Password) -and [string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText) -and (!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))) {
                             $uiHash.btnStartTests.IsEnabled = $true
                         }
-
-                        $uiHash.uiHost.Write("Finished UI initialization!")
 
                     }
 
@@ -124,30 +141,32 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                 }
             )
 
+            $uiHash.Window.Add_Loaded(
+                {
+                    $uiHash.Splash.Dispatcher.Invoke([action]{$uiHash.Splash.Close()})
+                }
+            )
+
             $uiHash.btnStartDebug.Add_Click(
                 {
-                    #$uiHash.tabMain.SelectedIndex = 1
-                    #GetForestData
+                    #testing goes here
                 }
             )
 
             $uiHash.btnConnect.Add_Click(
                 {
-
                     $connectBlock = {
                         InvokeSkypeOnlineConnection -authFromGui
                     }
 
-                    #should really have a handle on this runspace!
-                    StartTestsInRunspace -codeBlock $connectBlock -RunspaceHandleName "RspSfboConnect"
+                    Invoke-NewRunspace -codeBlock $connectBlock -RunspaceHandleName "RspSfboConnect"
                 }
             )
 
             $uiHash.comboVersion.Add_SelectionChanged(
                 {
-                    #update the hash to we can use it in this codeblock!
                     $uiHash.ComboVersionSelectedValue = $uihash.comboVersion.SelectedValue
-                    FormCheckModules
+                    Invoke-CheckModules
                 }
             )
 
@@ -197,17 +216,20 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         $uiHash.ProgressBarVisibility = "Visible"
 
                         #test execution
-                        $uiHash.ProgressBarStatus = 20
+                        $uiHash.ProgressBarStatus = 17
                         GetForestData
 
-                        $uiHash.ProgressBarStatus = 40
+                        $uiHash.ProgressBarStatus = 33
                         GetCmsReplicationStatus
                         
-                        $uiHash.ProgressBarStatus = 60
+                        $uiHash.ProgressBarStatus = 50
                         GetAccessEdgeConfiguration
                         
-                        $uiHash.ProgressBarStatus = 80
+                        $uiHash.ProgressBarStatus = 67
                         GetHostingProviderConfiguration
+
+                        $uiHash.ProgressBarStatus = 84
+                        TestFEToEdgePorts
 
                         #re-enable the button :)
                         $uiHash.ProgressBarStatus = 100
@@ -220,7 +242,7 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         $uiHash.CodeBlockError = $Error
                     }
 
-                    StartTestsInRunspace -codeBlock $testCode -RunspaceHandleName "RspStartTests"
+                    Invoke-NewRunspace -codeBlock $testCode -RunspaceHandleName "RspStartTests"
 
                 }
             )
@@ -265,12 +287,11 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
         $uiHash.Window.ShowDialog() | Out-Null
         $uiHash.Error = $Error
         
-    })
+    }
 
-    Write-Host "Creating runspace for script..."
-    $psCmd.Runspace = $newRunspace
-    Write-Host "Starting UI..." -ForegroundColor Green
-    $uiHash.RspMainUi = $psCmd.BeginInvoke()
+    Invoke-NewRunspace -codeBlock $mainWindow -RunspaceHandleName RspMainUi
+    
+    Write-Host "Attempting to start UI..." -ForegroundColor Green
     
 }
 
@@ -304,7 +325,7 @@ function ValidateSfboItems {
     }
 }
 
-function StartTestsInRunspace {
+function Invoke-NewRunspace {
     [cmdletbinding()]
     param(
         [parameter(Mandatory=$true)]$codeBlock,
@@ -327,7 +348,7 @@ function StartTestsInRunspace {
     $uiHash.($RunspaceHandleName) = $testingHandle
 }
 
-function FormCheckModules {
+function Invoke-CheckModules {
     #detect modules for on-prem pieces
     switch ($uiHash.ComboVersionSelectedValue) {
         "Skype for Business Server 2015" { 
@@ -537,18 +558,29 @@ function InvokeSkypeOnlineConnection{
         $uiHash.SfboStatusText = "Connecting..."
 
         try {
-            $uiHash.SfboSession = New-CsOnlineSession -Credential $sfboCreds -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+
+            if ($uiHash.AdminDomainIsChecked) {
+                $uiHash.SfboSession = New-CsOnlineSession -Credential $sfboCreds -OverrideAdminDomain ($uiHash.TenantDomainText + ".onmicrosoft.com") -ErrorAction SilentlyContinue -WarningAction SilentlyContinue                
+            } else {
+                $uiHash.SfboSession = New-CsOnlineSession -Credential $sfboCreds -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+            }
+
             $uiHash.Status = "Attempting to import remote PowerShell session..."
             $uiHash.ProgressBarStatus = "60"
             $uiHash.PSSessionImportResult = Import-PSSession $uiHash.SfboSession -Prefix Sfbo -ErrorAction SilentlyContinue
+
         } catch [System.ArgumentNullException] {
+
             $uiHash.SfboStatusText = "Could not create the session. Possibly due to a bad username/password."
             $uiHash.ConnectIsEnabled = $true
             $uiHash.Status = "Ready"
             return
+
         } catch {
+
             $uihash.SfboStatusText = $_.Exception.Message
             $uiHash.ConnectIsEnabled = $true
+
         }
 
         $uiHash.ProgressBarVisibility = "Hidden"
@@ -598,28 +630,28 @@ function ProcessResult{
     }
 }
 
-function TestFrontEndServers {
-    [cmdletbinding()]
-    Param
-    ()
-
-    begin {
-        $testId = $resources.FeServerPortTestId
-    }
-    process {
+function TestFEToEdgePorts {
+    $testId = '0014'
         #find all Edge servers to test FE to EDGE association
         [array]$edgeServers = ((Get-CsService -EdgeServer).Identity).Replace("EdgeServer:","")
+
 
         #note: we don't do a Get-CsService -Registrar here because we want the associated FE's for all Edge servers. Some FE's might not have an Edge association defined.
         [array]$poolServers = (((Get-CsService -EdgeServer).DependentServiceList) | Where-Object {$_ -like "Registrar:*"}).Replace("Registrar:","")
         $registrarServers = ($poolServers | ForEach-Object {Get-CsPool -Identity $_}).Computers
-        [array]$frontEndToEdgePorts = ($resources.FeServerPortTestList).split(",")
+        [array]$frontEndToEdgePorts = "443,4443,5061,5062,8057,50001,50002,50003"
+
         $edgeServerTestResults = TestTcpPortConnection -Ports $frontEndToEdgePorts -Source $registrarServers -Destination $edgeServers
         $edgeServerTestResults | ForEach-Object {
-            ProcessResult -testId $resources.FeServerPortTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $_.Destination -testErrorMessage $($resources.FeServerPortTestErrorMessage + $_.Port) -testSuccessMessage $($resources.FeServerPortTestSuccessMessage + $_.Port) -testExpectedValue $resources.PortTestExpected -testValue $_.TestResult
+            if ($_.TestResult -eq "Connected") {
+                #success; write it out
+                $testMessage = "Successfully connected to {0} from {1} on port {2}." -f $_.Destination, $_.Source, $_.Port
+            } else {
+                $testMessage = "Unable to establish TCP connection from {0} to {1} on {3}:" -f $_.Source, $_.Destination, $_.Port
+            }
+            
+            ProcessResult -testId $testId -testName TestFEtoEdgePorts -sourceComputerName $_.PSComputerName -destinationComputerName $_.Destination -testMessage $testMessage -testValue $_.TestResult -testExpectedValue "Connected"
         }
-    }
-    end {}
 }
 
 function CompareFederationBetweenOnlineOnPrem {
@@ -660,7 +692,6 @@ function TestTcpPortConnection{
         ForEach ($d in $Destination) {
             #we should remove the source server from the array just in case since we don't want to test from/to the same server
             If ($Source.Contains($d)) {
-                Write-Verbose -Message $resources.PortTestRemoveDestinationMessage
                 [System.Collections.ArrayList]$NewSource = $Source #alternatively we could use $NewSource = $Source -ne $d
                 $NewSource.Remove($d)
             } else {

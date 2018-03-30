@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         
-        Name="MainForm" Title="Microsoft 365 FastTrack" Height="600" Width="900" Background="#FF0874AA" MinWidth="900" MinHeight="600" ResizeMode="CanResizeWithGrip">
+        Name="MainForm" Title="Microsoft 365 FastTrack" Height="600" Width="900" Background="#FF0874AA" MinWidth="900" MinHeight="600" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <x:Array x:Key="resultsData" Type="sys:Object"/>
     </Window.Resources>
@@ -45,7 +45,7 @@
                     <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,375,10,0" HorizontalAlignment="Right" Width="110" Height="24" VerticalAlignment="Top"/>
                     <TextBlock HorizontalAlignment="Left" Margin="19,294,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
                     <TextBlock HorizontalAlignment="Left" Margin="29,404,0,0" TextWrapping="Wrap" Text="Status:" VerticalAlignment="Top"/>
-                    <TextBlock Name="txtSfboStatus" Text="You must provide the required information to connect to Skype for Business Online." Margin="193,404,10,10" TextWrapping="Wrap" Foreground="Black"/>
+                    <TextBlock Name="txtSfboStatus" Text="You must provide the required information to connect to Skype for Business Online." Margin="163,404,10,10" TextWrapping="Wrap" Foreground="Black"/>
                     <TextBlock Name="txtUserNotify" HorizontalAlignment="Left" Margin="378,323,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Height="20" Width="478" Foreground="Black"/>
 
                 </Grid>
