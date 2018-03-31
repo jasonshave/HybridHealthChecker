@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         
-        Name="MainForm" Title="Microsoft 365 FastTrack" Height="500" Width="900" Background="#FF0874AA" MinWidth="901" MinHeight="550" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
+        Name="MainForm" Title="Microsoft 365 FastTrack" Height="480" Width="900" Background="#FF0874AA" MinWidth="901" MinHeight="480" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <x:Array x:Key="resultsData" Type="sys:Object"/>
     </Window.Resources>
@@ -18,29 +18,23 @@
                     <Label Content="On-Premises Configuration"  HorizontalAlignment="Left" Height="32" Margin="10,42,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
                     <TextBlock HorizontalAlignment="Left" Margin="29,79,0,0" TextWrapping="Wrap" Text="On-premises version:" VerticalAlignment="Top" Height="22" Width="129"/>
                     <ComboBox Name="comboVersion" Margin="163,79,0,0" Height="22" VerticalAlignment="Top" HorizontalContentAlignment="Stretch" HorizontalAlignment="Left" Width="210"/>
-                    <Label Content="Required Software" HorizontalAlignment="Left" Height="32" Margin="10,106,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
-                    <TextBlock Name="txtOnPremModuleName" Margin="29,172,0,0" TextWrapping="Wrap" Text="Skype for Business PowerShell Module" Height="24" VerticalAlignment="Top" HorizontalAlignment="Left" Width="374" Foreground="Black"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,143,0,0" TextWrapping="Wrap" Text="Skype for Business Online PowerShell Module" VerticalAlignment="Top" Height="24" Width="374" Foreground="Black"/>
 
-                    <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,201,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
-                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="163,323,0,0" Height="24" HorizontalAlignment="Left" Width="100" VerticalAlignment="Top"/>
-                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,238,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="486"/>
+                    <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,106,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
+                    <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="163,228,0,0" Height="24" HorizontalAlignment="Left" Width="100" VerticalAlignment="Top"/>
+                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,143,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="486"/>
 
-                    <TextBlock HorizontalAlignment="Left" Margin="29,267,0,0" TextWrapping="Wrap" Text="Tenant domain name:" VerticalAlignment="Top" Height="24" Width="129"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="308,267,0,0" TextWrapping="Wrap" Text=".onmicrosoft.com" VerticalAlignment="Top" Height="24" Width="125"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,294,0,0" TextWrapping="Wrap" Text="Username:" VerticalAlignment="Top" Height="24" Width="129"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="19,267,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,172,0,0" TextWrapping="Wrap" Text="Tenant domain name:" VerticalAlignment="Top" Height="24" Width="129"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="308,172,0,0" TextWrapping="Wrap" Text=".onmicrosoft.com" VerticalAlignment="Top" Height="24" Width="125"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,201,0,0" TextWrapping="Wrap" Text="Username:" VerticalAlignment="Top" Height="22" Width="129"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="19,172,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
 
-                    <TextBox Name="txtTenantDomain" HorizontalAlignment="Left" Height="22" Margin="163,267,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="140" />
-                    <TextBox Name="txtUsername" HorizontalAlignment="Left" Height="22" Margin="163,296,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="210"/>
-
-                    <Button Name="btnSFBOAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,143,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="100"/>
-                    <Button Name="btnAdminInstalled" Content="Installed" IsEnabled="False" Margin="0,172,10,0" Height="24" VerticalAlignment="Top" HorizontalAlignment="Right" Width="100"/>
-                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,323,10,0" HorizontalAlignment="Right" Width="100" Height="24" VerticalAlignment="Top"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="19,294,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
-                    <TextBlock HorizontalAlignment="Left" Margin="29,352,0,0" TextWrapping="Wrap" Text="Status:" VerticalAlignment="Top" Height="22"/>
-                    <TextBlock Name="txtSfboStatus" Text="You must provide the required information to connect to Skype for Business Online." Margin="163,352,10,10" TextWrapping="Wrap" Foreground="Black"/>
-                    <TextBlock Name="txtUserNotify" HorizontalAlignment="Left" Margin="378,298,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Height="20" Width="478" Foreground="Black"/>
+                    <TextBox Name="txtTenantDomain" HorizontalAlignment="Left" Height="22" Margin="163,172,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="140" />
+                    <TextBox Name="txtUsername" HorizontalAlignment="Left" Height="22" Margin="163,201,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="210"/>
+                    <Button Name="btnStartTests" IsEnabled="False" Content="Start Tests" Margin="0,228,494,0" HorizontalAlignment="Right" Width="100" Height="24" VerticalAlignment="Top"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="19,201,0,0" TextWrapping="Wrap" Text="*" VerticalAlignment="Top" Foreground="Red"/>
+                    <TextBlock HorizontalAlignment="Left" Margin="29,257,0,0" TextWrapping="Wrap" Text="Status:" VerticalAlignment="Top" Height="22"/>
+                    <TextBlock Name="txtSfboStatus" Text="You must provide the required information to connect to Skype for Business Online." Margin="162,257,11,10" TextWrapping="Wrap" Foreground="Black"/>
+                    <TextBlock Name="txtUserNotify" HorizontalAlignment="Left" Margin="378,201,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Height="22" Width="478" Foreground="Black"/>
 
                 </Grid>
             </TabItem>

@@ -140,11 +140,8 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
 
                         #update buttons
                         $uiHash.btnConnect.IsEnabled = $uiHash.ConnectIsEnabled
-                        $uiHash.btnAdminInstalled.IsEnabled = $uiHash.AdminInstalledIsEnabled
-                        $uiHash.btnAdminInstalled.Content = $uiHash.AdminInstalledContent
-                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $uiHash.SFBOAdminInstalledIsEnabled
 
-                        if ([string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText) -and (!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))) {
+                        if ([string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText)) {
                             $uiHash.btnStartTests.IsEnabled = $true
                         }
                     }
@@ -209,12 +206,6 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         "Skype for Business Server 2015" { Start-Process $variableHash['SfbTools'] }
                         "Lync Server 2013" { Start-Process $variableHash['LyncTools'] }
                     }
-                }
-            )
-
-            $uiHash.btnSFBOAdminInstalled.Add_Click(
-                {
-                    Start-Process $variableHash['SfbOTools']
                 }
             )
 
