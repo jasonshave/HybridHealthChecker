@@ -1,17 +1,16 @@
-<#
 function Get-SkypeForBusinessHybridHealth {
     Write-Host -ForegroundColor Green "This command has been deprecated. Starting new command: Invoke-SkypeForBusinessHybridHealthCheck"
     Invoke-SkypeForBusinessHybridHealthCheck
 }
-#>
+
 
 function Invoke-SkypeForBusinessHybridHealthCheck {
     ##############################
     #.SYNOPSIS
-    #Performs several standardized tests for Skype for Business Hybrid connectivity to Skype for Business Online.
+    # Performs several standardized tests for Skype for Business Hybrid connectivity to Skype for Business Online.
     #
     #.DESCRIPTION
-    #Using XAML with WPF controls and .NET runspaces we build a UI to interface with the various functions'
+    # Using XAML with WPF controls and .NET runspaces we build a UI to interface with the various functions'
     # which perfor the necessary tests. Output is displayed by modifying abstracted variables which reference'
     # the XAML controls scraped at runtime. Name tags in the XAML which represent WPF controls are manipulated'
     # using a .NET DispatcherTimer. The application presents a splash screen, then the main UI.
