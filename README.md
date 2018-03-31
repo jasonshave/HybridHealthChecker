@@ -15,5 +15,13 @@ The following tests are performed:
     - IsLocal ($true)
     - AutoDiscoverUrl (tenant specific)
 
-3. **GetAccessEdgeConfiguration** - Several tests are performed against the on-premises configuration by getting settings from 'Get-CsAccessEdgeConfiguration'.
+3. **GetAccessEdgeConfiguration** - Several tests are performed against the on-premises configuration by getting settings from 'Get-CsAccessEdgeConfiguration'. The following parameters are evaluated:
+    - AllowOutsideUsers ($true)
+    - AllowFederatedUsers ($true)
+    - PartnerDiscovery ($true)
+    - RoutingMethod (UseDnsSrvRouting)
+
+4. **TestFeToEdgePorts** - This function involves querying the Edge servers in topology and locating the pools & servers associated with them. A .NET TCP connect attempt is made using an array of ports from the Front-End servers to each Edge server. Each tested combination is recorded in the results grid within the UI.
+
+5. **GetSharedSipAddressSpace** - A connection is made from the on-premises computer to Skype for Business Online in an attempt to check the 'SharedSipAddressSpace' parameter. This needs to be set to $true so the test evaluates this.
 
