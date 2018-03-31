@@ -47,8 +47,10 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     $variableHash.requiredModules = @("SkypeOnlineConnector","SkypeForBusiness","Lync")
 
     foreach ($moduleName in $variableHash.requiredModules) {
-        $variableHash.($moduleName) = Get-Module $moduleName
+        $variableHash.($moduleName) = Get-Module $moduleName -ListAvailable
     }
+
+    Write-Host "Attempting to start UI..." -ForegroundColor Green
     
     #DISPLAY SPLASH#
     $splashBlock = {
@@ -85,6 +87,7 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     }
 
     Invoke-NewRunspace -codeBlock $splashBlock -RunspaceHandleName RspSplashScreen
+    Start-Sleep -Seconds 3
 
     #DISPLAY MAIN WINDOW#
     $mainWindow = {
@@ -143,8 +146,9 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                         $uiHash.btnAdminInstalled.IsEnabled = $uiHash.AdminInstalledIsEnabled
                         $uiHash.btnAdminInstalled.Content = $uiHash.AdminInstalledContent
                         $uiHash.btnSFBOAdminInstalled.IsEnabled = $uiHash.SFBOAdminInstalledIsEnabled
+                        $uiHash.btnSFBOAdminInstalled.Content = $uiHash.SFBOAdminInstalledContent
 
-                        if ([string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText) -and (!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))) {
+                        if ($uiHash.SfboSession.State -eq "Opened" -and !$uiHash.SFBOAdminInstalledIsEnabled -and !$uiHash.AdminInstalledIsEnabled) {
                             $uiHash.btnStartTests.IsEnabled = $true
                         }
                     }
@@ -316,9 +320,6 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     }
 
     Invoke-NewRunspace -codeBlock $mainWindow -RunspaceHandleName RspMainUi
-    
-    Write-Host "Attempting to start UI..." -ForegroundColor Green
-    
 }
 
 # INTERNAL FUNCTIONS #
@@ -391,8 +392,7 @@ function Invoke-CheckModules {
             $mName = "Lync"
             $uiHash.OnPremModuleNameText = "Lync Server 2013 PowerShell Module"
         }
-        Default { #need to verify we need this still?
-            $mName = "Not found"
+        Default {
             $uiHash.Status = "Could not locate either module for Skype or Lync admin tools."
         }
     }
@@ -409,6 +409,9 @@ function Invoke-CheckModules {
     if (!$variableHash.SkypeOnlineConnector) {
         $uiHash.SFBOAdminInstalledIsEnabled = $true
         $uiHash.SFBOAdminInstalledContent = "More Info"
+    } else {
+        $uiHash.SFBOAdminInstalledIsEnabled = $false
+        $uiHash.SFBOAdminInstalledContent = "Installed"
     }
 }
 
