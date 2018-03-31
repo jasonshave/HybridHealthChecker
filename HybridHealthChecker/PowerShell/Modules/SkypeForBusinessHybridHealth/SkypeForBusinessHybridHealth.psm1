@@ -87,7 +87,6 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     #DISPLAY MAIN WINDOW#
     $mainWindow = {
         $uiHash.Hosts.("RspMainUi") = $Host
-        Write-Verbose "FOO"
         Add-Type -AssemblyName PresentationFramework
         
         $uiContent = Get-Content -Path ($variableHash.rootPath + "\MainWindow.xaml")
