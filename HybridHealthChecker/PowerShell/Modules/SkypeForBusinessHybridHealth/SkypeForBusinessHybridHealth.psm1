@@ -1,397 +1,443 @@
-function Get-SkypeForBusinessHybridHealth{
-    [cmdletbinding()]
-    Param(
-        [Parameter(Mandatory=$true,HelpMessage="Please enter your Office 365 domain:",Position=1,ParameterSetName="OnPrem")]$TenantDomain,
-        [Parameter(Mandatory=$false,ParameterSetName="OnPrem")][PSCredential]$SkypeOnlineCredentials,
-        [Parameter(Mandatory=$false,ParameterSetName="OnPrem")][switch]$OverrideAdminDomain,
-        [Parameter(Mandatory=$false,ParameterSetName="Edge")][switch]$TestEdgeServer
-    )
-
-    begin{
-        #import resources file
-        try{
-            Import-LocalizedData -BindingVariable Resources -FileName "SkypeForBusinessHybridHealthResources.psd1" -ErrorAction SilentlyContinue -ErrorVariable errorMessage
-        }catch{
-            throw;
-        }
-
-        if (!$TestEdgeServer){
-            #validate required modules
-            [array]$requiredModules = ($resources.RequiredModules).split(",")
-            $requiredModules | ModuleValidation
-
-            #get objects to perform tests
-            $authDC = GetAuthDc
-            $tenantInfo = GetTenantInfo -TenantDomain $TenantDomain
-        }
-
-        #start SFBO connection
-        InvokeSkypeOnlineConnection
-    }
-    process{
-        #tests
-        if (!$TestEdgeServer){
-            GetDomainControllerData
-            GetForestData
-            GetCmsReplicationStatus
-            GetAccessEdgeConfiguration
-            GetHostingProviderConfiguration
-            GetTenantFederationConfiguration
-            CompareFederationBetweenOnlineOnPrem
-            TestFrontEndServers
-            TestServerPatchVersion
-        }
-
-    }
-    end{
-        Get-PSSession | Remove-PSSession
-    }
+function Get-SkypeForBusinessHybridHealth {
+    Write-Host -ForegroundColor Green "This command has been deprecated. Starting new command: Invoke-SkypeForBusinessHybridHealthCheck"
+    Invoke-SkypeForBusinessHybridHealthCheck
 }
 
 function Invoke-SkypeForBusinessHybridHealthCheck {
-    [CmdletBinding()]
- 
-    Param(
-        #[Parameter()]$Global:XamlPath = Get-Content -Path (Split-Path (Get-Module SkypeForBusinessHybridHealth).Path) + "\MainWindow.xaml"
-    )
- 
-    begin {
-        #create runspace for multithreading
-        $uiHash = [hashtable]::Synchronized(@{})
-        $variableHash = [hashtable]::Synchronized(@{})
+    ##############################
+    #.SYNOPSIS
+    #Performs several standardized tests for Skype for Business Hybrid connectivity to Skype for Business Online.
+    #
+    #.DESCRIPTION
+    #Using XAML with WPF controls and .NET runspaces we build a UI to interface with the various functions'
+    # which perfor the necessary tests. Output is displayed by modifying abstracted variables which reference'
+    # the XAML controls scraped at runtime. Name tags in the XAML which represent WPF controls are manipulated'
+    # using a .NET DispatcherTimer. The application presents a splash screen, then the main UI.
+    #
+    #.EXAMPLE
+    # Invoke-SkypeForBusinessHybridHealthCheck
+    #
+    #.NOTES
+    # Source code available at: https://github.com/jasonshave/HybridHealthChecker
+    ##############################
 
-        $variableHash.Add('2013Tools', "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx")
-        $variableHash.Add('2015Tools', "https://technet.microsoft.com/en-ca/library/dn933921.aspx")
-        $variableHash.Add('SFBOTools', "https://www.microsoft.com/en-us/download/details.aspx?id=39366")
-        $variableHash.Add('xmlWPF', (Get-Content -Path "C:\users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\MainWindow.xaml"))
+    #primary sync'd hashtable for variables and object references
+    $Global:uiHash = [hashtable]::Synchronized(@{})
+
+    #store runspaces in jobs array so we can dispose of them when we're done
+    $Jobs = @{}
+    $uiHash.Jobs = $Jobs
+    $Hosts = @{}
+    $uiHash.Hosts = $Hosts
+    $RunspaceOutput = @{}
+    $uiHash.RunspaceOutput = $RunspaceOutput
+    
+    #this is where we store all our results from the tests
+    $uiHash.resultsHash = $null
+    
+    #sync'd hash table for variables we need in each runspace
+    $Global:variableHash = [hashtable]::Synchronized(@{})
+
+    $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
+    $variableHash.SfbTools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
+    $variableHash.SfbOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
+    $variableHash.rootPath = Split-Path (Get-module SkypeForBusinessHybridHealth).path
+    $variableHash.requiredModules = @("SkypeOnlineConnector","SkypeForBusiness","Lync")
+
+    foreach ($moduleName in $variableHash.requiredModules) {
+        $variableHash.($moduleName) = Get-Module $moduleName
+    }
+    
+    #DISPLAY SPLASH#
+    $splashBlock = {
+        $uiHash.Hosts.("RspSplashScreen") = $Host
         
-        #create runspace and add hash tables as variables to it
-        $newRunspace =[runspacefactory]::CreateRunspace()
-        $newRunspace.ApartmentState = "STA"
-        $newRunspace.ThreadOptions = "ReuseThread"         
-        $newRunspace.Open()
-        $newRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
-        $newRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
+        Add-Type -AssemblyName PresentationFramework
+        
+        $uiContent = Get-Content -Path ($variableHash.rootPath + "\Splash.xaml")
+        
+        [xml]$xAML = $uiContent -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
+        $uiHash.Splash = [Windows.Markup.XamlReader]::Load($xmlReader)
 
+        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
+            $uiHash.Add($_.Name, $uiHash.Splash.FindName($_.Name))
+        }
+
+        #region EVENTS#
+
+            $uiHash.Splash.Add_SourceInitialized(
+                {
+                    $uiHash.picSplash1.Source = ($variableHash.rootPath + "\Skype_for_Business_Logo.png")
+                }
+            )
+
+            $uiHash.Splash.Add_MouseRightButtonDown(
+                {
+                    $uiHash.Splash.Close()
+                }
+            )
+        #end region EVENTS#
+
+        $uiHash.Splash.ShowDialog() | Out-Null
     }
 
-    process {
-        $psCmd = [PowerShell]::Create()
-		$null = $psCmd.AddScript(
-            {
-                Add-Type -AssemblyName PresentationFramework
+    Invoke-NewRunspace -codeBlock $splashBlock -RunspaceHandleName RspSplashScreen
 
-                #scrape XAML for unwanted tags
-                [xml]$xAML = $variableHash.xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
-                $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
-                $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
+    #DISPLAY MAIN WINDOW#
+    $mainWindow = {
+        $uiHash.Hosts.("RspMainUi") = $Host
+        Write-Verbose "FOO"
+        Add-Type -AssemblyName PresentationFramework
+        
+        $uiContent = Get-Content -Path ($variableHash.rootPath + "\MainWindow.xaml")
+        
+        [xml]$xAML = $uiContent -replace 'mc:Ignorable="d"','' -replace "x:N",'N' -replace '^<Win.*', '<Window'
+        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
+        $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
 
-                #populate uiHash with XAML name tags so we can reference them in code (i.e. btnButton = $uiHash.btnButton.Add_Click)
-                $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
-                    $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
-                }
+        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
+            $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
+        }
 
-                #place all events for the form within this $psCmd so they execute as they should
+        #region EVENTS#
+        
+            $uiHash.Window.Add_SourceInitialized(
+                {
+                    $uiHash.picSfb.Source = ($variableHash.rootPath + "\sfb.png")
+                    $uiHash.Window.Icon = ($variableHash.rootPath + "\sfb.png")
+                    $uiHash.txtVersion.Text = ((Get-Module SkypeForBusinessHybridHealth).Version).toString()
 
-                function FormFirstRun {
-                    $uiHash.comboVersion.SelectedIndex = 0
                     $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
+                    $uiHash.comboVersion.SelectedIndex = 0
+                    $uiHash.ComboVersionSelectedValue = $uiHash.comboVersion.SelectedValue
 
-                    $uiHash.comboForest.SelectedIndex = 0
-                    $uiHash.comboForest.ItemsSource = @("Windows2016Forest","Windows2012R2Forest","Windows2012Forest","Windows2008R2Forest","Windows2008Forest")
+                    $uiHash.Status = "Ready"
+                    $uiHash.StatusColor = "White"
+                    $uiHash.ProgressBarVisibility = "Hidden"
+                    $uiHash.ConnectIsEnabled = $false
+                    $uiHash.SfboStatusText = "You must provide the required information to connect to Skype for Business Online."
+                    $uiHash.AdminDomainIsChecked = $false
+                    $uiHash.OnPremModuleNameText = "Skype for Business PowerShell Module"
 
-                    #set the version attribute on the help tab
-                    $modVer = (Get-Module SkypeForBusinessHybridHealth).Version
-                    if (!($modVer)) {
-                        $uiHash.txtVersion.Text = "Unable to determine version"
-                    } else {
-                        $uiHash.txtVersion.Text = $modVer.Major + "." + $modVer.Minor + "." + $modVer.Build + "." + $modVer.Revision
+                    Invoke-CheckModules
+
+                    $updateBlock = {
+                        #update the results grid with our data via XAML binding attribute called "resultsData"
+                        $uiHash.Window.Resources["resultsData"] = $uiHash.resultsHash
+
+                        #update status bar
+                        $uiHash.barStatus.Value = $uiHash.ProgressBarStatus
+                        $uiHash.barStatus.Visibility = $uiHash.ProgressBarVisibility
+
+                        #update text blocks
+                        $uiHash.txtStatus1.Text = $uiHash.Status
+                        $uiHash.txtStatus1.Foreground = $uiHash.StatusColor
+                        $uiHash.txtSfboStatus.Text = $uiHash.SfboStatusText
+                        $uiHash.txtUserNotify.Text = $uiHash.UserNotifyText
+                        $uiHash.txtOnPremModuleName.Text = $uiHash.OnPremModuleNameText
+
+                        #update buttons
+                        $uiHash.btnConnect.IsEnabled = $uiHash.ConnectIsEnabled
+                        $uiHash.btnAdminInstalled.IsEnabled = $uiHash.AdminInstalledIsEnabled
+                        $uiHash.btnAdminInstalled.Content = $uiHash.AdminInstalledContent
+                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $uiHash.SFBOAdminInstalledIsEnabled
+
+                        if ([string]::IsNullOrEmpty($uiHash.Username) -and [string]::IsNullOrEmpty($uiHash.TenantDomainText) -and (!($uiHash.btnAdminInstalled.IsEnabled)) -and (!($uiHash.btnSFBOAdminInstalled.IsEnabled))) {
+                            $uiHash.btnStartTests.IsEnabled = $true
+                        }
                     }
-                    
+
+                    # Create timer to handle updating the grid
+                    $timer = new-object System.Windows.Threading.DispatcherTimer
+                    $timer.Interval = [TimeSpan]"0:0:0:0.30"
+                    $timer.Add_Tick($updateBlock)
+                    $timer.Start()
                 }
+            )
 
-                function FormCheckModules ($ModuleName) {
-                    #detect modules for on-prem pieces
-                    switch ($ModuleName) {
-                        "Skype for Business Server 2015" { 
-                            $ModuleName = "SkypeForBusiness"
-                            $uiHash.txtOnPremModuleName.Text = "Skype for Business Server 2015 PowerShell Module"
-                        }
-                        "Lync Server 2013" {
-                            $ModuleName = "Lync"
-                            $uiHash.txtOnPremModuleName.Text = "Lync Server 2013 PowerShell Module"
-                        }
-                        Default {
-                            $ModuleName = "Skype for Business Server 2015"
-                        }
-                    }
-                
-                    if (!(Get-Module $ModuleName -ListAvailable)) {
-                        $uiHash.btnAdminInstalled.IsEnabled = $true
-                        $uiHash.btnAdminInstalled.Content = "More Info"
-                    } else {
-                        $uiHash.btnAdminInstalled.IsEnabled = $false
-                        $uiHash.btnAdminInstalled.Content = "Installed"
-                    }
-
-                    #detect if SFBO module is available
-                    if (!(Get-Module SkypeOnlineConnector -ListAvailable)) {
-                        $uiHash.btnSFBOAdminInstalled.IsEnabled = $true
-                        $uiHash.btnSFBOAdminInstalled.Content = "More Info"
-                    }
-
-                    if ($uiHash.btnAdminInstalled -and $uiHash.btnSFBOAdminInstalled) {
-                        $uiHash.btnStartTests.IsEnabled = $true
-                    }
-                
+            $uiHash.Window.Add_Closing(
+                {
+                    Remove-PSSession $uiHash.SfboSession
                 }
+            )
 
-            #region TESTS
-
-                function GetForestData{
-                    $authDC = ($env:LOGONSERVER).Replace("\\","") + "." + $env:USERDNSDOMAIN
-                    $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock {Get-ADForest} -ErrorAction SilentlyContinue -ErrorVariable forestErr
-                    $forestMode = $forestData.ForestMode
-
-                    [array]$outputResult = [PSCustomObject][ordered]@{
-                        TestId = '0001'
-                        TestName = 'GetForestData'
-                        TestedResult = $(if($uiHash.comboForest.SelectedValue -ne $forestMode){"FAIL"}else{"PASS"})
-                        ExpectedValue = $uiHash.comboForest.SelectedValue
-                        TestedValue = $forestMode
-                        TestMessage = $null
-                        SourceComputerName = ($env:COMPUTERNAME + "." + $env:USERDNSDOMAIN)
-                        DestinationComputerName = $authDC
-                        TestDate = $(Get-Date)
+            $uiHash.Window.Add_Closed(
+                {
+                    #this is where we do our cleanup to prevent memory leaks.
+                    #we don't want these runspaces to consume memory if they're
+                    #not in use even after the window has been closed.
+                    foreach ($rsp in $uiHash.Jobs) {
+                        $uiHash.Jobs.$rsp.Dispose()
                     }
-                    
-                    $uiHash.gridResults.AddChild($outputResult)
                 }
+            )
 
-            #end region
+            $uiHash.Window.Add_Loaded(
+                {
+                    $uiHash.Splash.Dispatcher.Invoke([action]{$uiHash.Splash.Close()})
+                }
+            )
 
-                #EVENTS#
-                $uiHash.Window.Add_Loaded(
-                    {
-                        FormFirstRun
-                        FormCheckModules($uiHash.comboVersion.SelectedValue)
+            $uiHash.btnStartDebug.Add_Click(
+                {
+                    #testing goes here
+                }
+            )
+
+            $uiHash.btnConnect.Add_Click(
+                {
+                    $connectBlock = {
+                        InvokeSkypeOnlineConnection -authFromGui
                     }
-                )
 
-                $uiHash.comboVersion.Add_SelectionChanged(
-                    {
-                        FormCheckModules($uiHash.comboVersion.SelectedValue)
-                    }
-                )
+                    Invoke-NewRunspace -codeBlock $connectBlock -RunspaceHandleName "RspSfboConnect"
+                }
+            )
 
-                $uiHash.btnAdminInstalled.Add_Click(
-                    {
-                        switch ($uiHash.comboVersion.SelectedValue) {
-                            "Skype for Business Server 2015" { Start-Process $variableHash['2015Tools'] }
-                            "Lync Server 2013" { Start-Process $variableHash['2013Tools'] }
-                        }
-                    }
-                )
+            $uiHash.comboVersion.Add_SelectionChanged(
+                {
+                    $uiHash.ComboVersionSelectedValue = $uihash.comboVersion.SelectedValue
+                    Invoke-CheckModules
+                }
+            )
 
-                $uiHash.btnSFBOAdminInstalled.Add_Click(
-                    {
-                        Start-Process $variableHash['SFBOTools']
+            $uiHash.btnAdminInstalled.Add_Click(
+                {
+                    switch ($uiHash.ComboVersionSelectedValue) {
+                        "Skype for Business Server 2015" { Start-Process $variableHash['SfbTools'] }
+                        "Lync Server 2013" { Start-Process $variableHash['LyncTools'] }
                     }
-                )
+                }
+            )
 
-                $uiHash.navFeedback.Add_Click(
-                    {
-                        Start-Process $uiHash.navFeedback.NavigateUri
-                    }
-                )
+            $uiHash.btnSFBOAdminInstalled.Add_Click(
+                {
+                    Start-Process $variableHash['SfbOTools']
+                }
+            )
 
-                $uiHash.navGitHub.Add_Click(
-                    {
-                        Start-Process $uiHash.navGitHub.NavigateUri
-                    }
-                )
+            $uiHash.navFeedback.Add_Click(
+                {
+                    Start-Process $uiHash.navFeedback.NavigateUri
+                }
+            )
+
+            $uiHash.navGitHub.Add_Click(
+                {
+                    Start-Process $uiHash.navGitHub.NavigateUri
+                }
+            )
                 
-                $uiHash.btnStartTests.Add_Click(
-                    {
-                        #clear previous test results
-                        $uiHash.gridResults.Items.Clear()
+            $uiHash.btnStartTests.Add_Click(
+                {
+                    #clear previous test results and change the view to the Results tab
+                    $uiHash.resultsHash = $null
+                    $uiHash.tabMain.SelectedIndex = 1
 
-                        #display progress bar
-                        $uiHash.barStatus.Visibility = "Visible"
-                        #update statusbar
-                        $uiHash.txtStatus1.Text = "Starting tests..."
+                    $testCode = {
+                        $uiHash.Status = "Running tests..."
+                        $uiHash.StartTestButtonIsEnabled = $false
+                        $uiHash.ProgressBarVisibility = "Visible"
 
-                        #switch to results tab
-                        $uiHash.tabMain.SelectedIndex = 1
+                        #test execution
+                        $uiHash.ProgressBarStatus = 17
+                        GetCmsReplicationStatus
+                        
+                        $uiHash.ProgressBarStatus = 33
+                        GetHostingProviderConfiguration
+                        
+                        $uiHash.ProgressBarStatus = 50
+                        GetAccessEdgeConfiguration
 
-                        #start first test (need a runspace for this)
-                        GetForestData
+                        $uiHash.ProgressBarStatus = 67
+                        TestFEToEdgePorts
+                        
+                        $uiHash.ProgressBarStatus = 84
+                        GetSharedSipAddressSpace
 
-                        #wrap it up
-                        $uiHash.txtStatus1.Text = "Finished"
-                        $uiHash.barStatus.Visibility = "Hidden"
+                        #re-enable the button :)
+                        $uiHash.ProgressBarStatus = 100
+                        $uiHash.ProgressBarVisibility = "Hidden"
+                        $uiHash.StartTestButtonIsEnabled = $true
+
+                        $uiHash.Status = "Finished!"
+                        $uiHash.StatusColor = "White"
+
+                        $uiHash.CodeBlockError = $Error
                     }
-                )
 
-                #START THE FORM#
-                $uiHash.Window.ShowDialog() | Out-Null
-                $uiHash.Error = $Error
-            }
-        )
+                    Invoke-NewRunspace -codeBlock $testCode -RunspaceHandleName "RspStartTests"
 
-        #wire up form objects before presenting the GUI
-        #create a new runspace for the XAML code
-        $psCmd.Runspace = $newRunspace
-        $uiHandle = $psCmd.BeginInvoke()
+                }
+            )
+
+            $uiHash.chkAdminDomain.Add_Checked(
+                {
+                    $uiHash.AdminDomainIsChecked = $uiHash.chkAdminDomain.IsChecked
+                    ValidateSfboItems
+                }
+            )
+
+            $uiHash.chkAdminDomain.Add_UnChecked(
+                {
+                    $uiHash.AdminDomainIsChecked = $uiHash.chkAdminDomain.IsChecked
+                    ValidateSfboItems
+                }
+            )
+
+            $uiHash.txtTenantDomain.Add_TextChanged(
+                {
+                    $uiHash.TenantDomainText = $uiHash.txtTenantDomain.Text
+                    ValidateSfboItems
+                }
+            )
+
+            $uiHash.txtUsername.Add_TextChanged(
+                {
+                    $uiHash.Username = $uiHash.txtUsername.Text
+                    ValidateSfboItems                
+                }
+            )
+
+            $uiHash.txtPassword.Add_TextInput( 
+                {
+                    ValidateSfboItems   
+                }
+            )
+        
+
+        #end region
+
+        $uiHash.Window.ShowDialog() | Out-Null
+        $uiHash.Error = $Error
         
     }
 
-    end {
-
-    }
-
+    Invoke-NewRunspace -codeBlock $mainWindow -RunspaceHandleName RspMainUi
+    
+    Write-Host "Attempting to start UI..." -ForegroundColor Green
+    
 }
 
 # INTERNAL FUNCTIONS #
-function InstallAdminTools ($Version) {
-    #verify all tools are available
-    $binPath = (get-module SkypeForBusinessHybridHealth).modulebase + "\bin"
-    switch ($Version) {
-        "Lync Server 2013" {
-            $2013Tools = $binPath + "\2013\"
 
-            $SFBtxtStatus1.Text = "Installing Visual C++ Redistributable..."
-            $vcInstall = Start-Process -FilePath ($2013Tools + "vcredist_x64.exe") -ArgumentList "/install /passive /norestart" -Wait
-            $SFBbarStatus.Value = "20"
+function ValidateSfboItems {
 
-            $SFBtxtStatus1.Text = "Installing SQL CLR Types..."
-            $clrInstall = Start-Process -FilePath ($2013Tools + "SQLSysClrTypes.msi") -ArgumentList "/qr" -Wait
-            $SFBbarStatus.Value = "40"
-
-            $SFBtxtStatus1.Text = "Installing SQL Shared Management Objects..."
-            $smoInstall = Start-Process -FilePath ($2013Tools + "SharedManagementObjects.msi") -ArgumentList "/qr" -Wait
-            $SFBbarStatus.Value = "60"
-            
-            $SFBtxtStatus1.Text = "Installing OCSCORE.msi..."
-            $ocsInstall = Start-Process -FilePath ($2013Tools + "ocscore.msi") -ArgumentList "/qr" -Wait
-            $SFBbarStatus.Value = "80"
-            
-            $SFBtxtStatus1.Text = "Installing Visual C++ Redistributable..."
-            $adminInstall = Start-Process -FilePath ($2013Tools + "admintools.msi") -ArgumentList "/qr" -Wait
-            $SFBbarStatus.Value = "100"
-            
-          }
-        "Skype for Business Server 2015" {
-            $2015Tools = $binPath + "\2015\"
-        }
+    if ([string]::IsNullOrEmpty($uiHash.TenantDomainText) -or [string]::IsNullOrEmpty($uiHash.Username)) {
+        $uiHash.ConnectIsEnabled = $false
+        return
     }
-}
 
-function ModuleValidation{
-    [cmdletbinding()]
-    Param
-    (
-        [Parameter(Mandatory=$false,ValueFromPipeline=$true)][array]$ModuleName
-    )
-
-    begin {}
-    process {
-        $foundModule = $true
-        if (!(Get-Module $ModuleName)){
-            #module is not loaded
-            Write-Verbose -Message $($resources.SearchingModuleMessage + $ModuleName)
-            $foundModule = Get-Module -ListAvailable | Where-Object Name -eq $ModuleName
-            if ($foundModule){
-                #module was found on the system
-                Write-Verbose -Message $resources.ImportModuleMessage
-                try{
-                    Import-Module $ModuleName -ErrorAction SilentlyContinue -ErrorVariable moduleError
-                }catch{
-                    #import-module did not execute
-                    throw $($ModuleName + ": " + ($resources.ModuleNoExecuteErrorMessage) + " " + $resources.$($ModuleName))
-                }
-                if ($moduleError){
-                    #import-module executed but returned an error
-                    throw $($ModuleName + ": " + ($resources.ModuleLoadErrorMessage) + " " + $resources.$($ModuleName))
-                }
-            }else{
-                #module was not found and is not loaded
-                 throw $($ModuleName + ": " + ($resources.ModuleNotFoundMessage) + " " +  $resources.$($ModuleName))
-            }
-        }
-    }
-    end {}
-}
-
-
-
-
-
-function GetForestData{
-    [cmdletbinding()]
-    Param()
-    begin {
-
-    }
-    process {
-        #perform PowerShell remoting to get Forest data.
-        $commandToExecute = [scriptblock]::Create($resources.ForestModeCheckCmd)
-        try{
-            $forestData = Invoke-Command -ComputerName $authDC -ScriptBlock $commandToExecute -ErrorAction SilentlyContinue -ErrorVariable forestErr
-        }catch{
-            #process this exception as the test result
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $_
+    #override admin domain
+    #if ($uiHash.AdminDomainIsChecked -and (![string]::IsNullOrEmpty($uiHash.Username)) -and (![string]::IsNullOrEmpty($uiHash.TenantDomainText))) {
+    if ($uiHash.AdminDomainIsChecked) {
+        try {
+            $validateUsername = [System.Net.Mail.MailAddress]($uiHash.Username)
+            $uiHash.UserNotifyText = "We'll use: " + $validateUsername
+            $uihash.ValidatedUserName = $validateUsername
+            $uihash.ConnectIsEnabled = $true
+            return
+        } catch {
+            $uiHash.UserNotifyText = "NOTE: The username should be in UPN format (i.e. username@domain.com)"
             return
         }
-
-        if (!$forestErr){
-            #didn't throw an exception and there was no error
-            Write-Verbose -Message $($resources.ForestModeMessage + $forestData.ForestMode)
-
-            #compare expected version with discovered version
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testSuccessMessage $resources.ForestModeSuccessMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $forestData.ForestMode
-        }else{
-            #there was an error, write the result
-            $forestModeResult = ProcessResult -testId $resources.ForestModeTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $authDC -testErrorMessage $resources.ForestModeErrorMessage -testExpectedValue $resources.ForestModeExpectedVersion -testValue $forestErr.ErrorDetails.Message
-        }
-
-
     }
-    end {
-        return $forestModeResult
+    #use standard login method
+    #if (!$uiHash.AdminDomainIsChecked -and (![string]::IsNullOrEmpty($uiHash.Username)) -and (![string]::IsNullOrEmpty($uiHash.TenantDomainText))) {
+    if (!$uiHash.AdminDomainIsChecked) {
+            $uiHash.UserNotifyText = "We'll use: " + $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
+            $uiHash.ValidatedUserName = $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
+            $uiHash.ConnectIsEnabled = $true
+    } else {
+        $uiHash.UserNotifyText = ""
     }
 }
 
-function GetCmsReplicationStatus{
+function Invoke-NewRunspace {
     [cmdletbinding()]
-    Param
-    (
-    [Parameter(Mandatory=$false)][string]$foo
+    param(
+        [parameter(Mandatory=$true)][scriptblock]$codeBlock,
+        [parameter(Mandatory=$true)][string]$RunspaceHandleName
     )
 
-    begin {}
-    process {
-        try{
-            $cmsReplicationResult = Get-CsManagementStoreReplicationStatus | Where-Object UpToDate -ne $true
-        }catch{
-            throw;
-        }
-        #walk through collection to build array of failed replication partners
-        if ($cmsReplicationResult) {
-            #we have failed replication servers
-            $cmsTested = $cmsReplicationResult.ReplicaFqdn
-        }else{
-            $cmsTested = $resources.CMSReplicationExpectedResult
-        }
+    $testingRunspace = [runspacefactory]::CreateRunspace()
+    $testingRunspace.ApartmentState = "STA"
+    $testingRunspace.ThreadOptions = "ReuseThread"
+    $testingRunspace.Open()
+    $testingRunspace.SessionStateProxy.SetVariable("uiHash",$uiHash)
+    $testingRunspace.SessionStateProxy.SetVariable("variableHash",$variableHash)
 
-        $cmsResult = ProcessResult -testId $resources.CMSReplicationTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.CMSReplicationErrorMessage -testSuccessMessage $resources.CMSReplicationSuccessMessage -testExpectedValue $resources.CMSReplicationExpectedResult -testValue $cmsTested
+    $uiHash.RunspaceOutput.($RunspaceHandleName) = New-Object System.Management.Automation.PSDataCollection[psobject]
+
+    $testingCmd = [PowerShell]::Create().AddScript($codeBlock)
+    $testingCmd.Runspace = $testingRunspace
+    
+    $testingHandle = $testingCmd.BeginInvoke($uiHash.RunspaceOutput.($RunspaceHandleName),$uiHash.RunspaceOutput.($RunspaceHandleName))
+
+    #store the handle in the global sync'd hashtable; arraylist we'll use the window.closed() event to clean up
+    $uiHash.Jobs.($RunspaceHandleName) = $testingHandle
+}
+
+function Invoke-CheckModules {
+    #detect modules for on-prem pieces
+    switch ($uiHash.ComboVersionSelectedValue) {
+        "Skype for Business Server 2015" { 
+            $mName = "SkypeForBusiness"
+            $uiHash.OnPremModuleNameText = "Skype for Business PowerShell Module"
+        }
+        "Lync Server 2013" {
+            $mName = "Lync"
+            $uiHash.OnPremModuleNameText = "Lync Server 2013 PowerShell Module"
+        }
+        Default { #need to verify we need this still?
+            $mName = "Not found"
+            $uiHash.Status = "Could not locate either module for Skype or Lync admin tools."
+        }
     }
-    end {
-        return $cmsResult
+
+    if (!($variableHash.$mName)) {
+        $uiHash.AdminInstalledIsEnabled = $true
+        $uiHash.AdminInstalledContent = "More Info"
+    } else {
+        $uiHash.AdminInstalledIsEnabled = $false
+        $uiHash.AdminInstalledContent = "Installed"
+    }
+
+    #detect if SFBO module is available
+    if (!$variableHash.SkypeOnlineConnector) {
+        $uiHash.SFBOAdminInstalledIsEnabled = $true
+        $uiHash.SFBOAdminInstalledContent = "More Info"
     }
 }
 
-function GetAccessEdgeConfiguration{
+function GetCmsReplicationStatus {
+
+    $testExpectedValue = "None"
+
+    $cmsReplicationResult = Get-CsManagementStoreReplicationStatus -ErrorVariable $testMessage
+    if (!($cmsReplicationResult)) {
+        $testValue = "Failed to execute test"
+    }
+
+    $failedReplicas = $cmsReplicationResult | Where-Object UpToDate -eq $False
+    if ($failedReplicas) {
+        #we have failed replication servers
+        [string]$testValue = $failedReplicas.ReplicaFqdn | ForEach-Object {$_ + "`r"}
+        $testMessage = "CMS Replica not up to date"
+    } else {
+        #all is okay
+        $testValue = "None"
+        $testMessage = "All CMS replicas are up to date"
+    }
+
+    [array]$objResult = ProcessResult -testName "GetCmsReplicationStatus" -testMessage $testMessage -testExpectedValue $testExpectedValue -testValue $testValue
+    
+    return $objResult
+
+}
+
+function GetAccessEdgeConfiguration {
     [cmdletbinding()]
     Param()
     begin {}
@@ -400,198 +446,159 @@ function GetAccessEdgeConfiguration{
         $accessEdgeConfig = Get-CsAccessEdgeConfiguration
 
         #check AllowOutsideUsers
-        ProcessResult -testId $resources.AccessEdgeOutsideUsersTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.AccessEdgeOutsideUsersErrorMessage -testSuccessMessage $resources.AccessEdgeOutsideUsersSuccessMessage -testExpectedValue $resources.AccessEdgeOutsideUsers -testValue $accessEdgeConfig.AllowOutsideUsers
+        $objResult = ProcessResult -testName 'Access Edge: AllowOutsideUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowOutsideUsers
         #check AllowFederatedUsers
-        ProcessResult -testId $resources.AccessEdgeFederatedUsersTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.AccessEdgeFederatedUsersErrorMessage -testSuccessMessage $resources.AccessEdgeFederatedUsersSuccessMessage -testExpectedValue $resources.AccessEdgeFederatedUsers -testValue $accessEdgeConfig.AllowFederatedUsers
+        $objResult = ProcessResult -testName 'Access Edge: AllowFederatedUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowFederatedUsers
         #check EnableParnterDiscovery
-        ProcessResult -testId $resources.AccessEdgePartnerDiscoveryTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.AccessEdgePartnerDiscoveryErrorMessage -testSuccessMessage $resources.AccessEdgePartnerDiscoverySuccessMessage -testExpectedValue $resources.AccessEdgePartnerDiscovery -testValue $accessEdgeConfig.EnablePartnerDiscovery
+        $objResult = ProcessResult -testName 'Access Edge: PartnerDiscovery' -testExpectedValue $true -testValue $accessEdgeConfig.EnablePartnerDiscovery
         #checkUseDnsSrvRouting
-        ProcessResult -testId $resources.AccessEdgeDnsSrvRoutingTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.AccessEdgeDnsSrvRoutingErrorMessage -testSuccessMessage $resources.AccessEdgeDnsSrvRoutingSuccessMessage -testExpectedValue $resources.AccessEdgeDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
+        $objResult = ProcessResult -testName 'Access Edge: UseDnsSrvRouting' -testExpectedValue UseDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
     }
     end {}
 }
 
-function GetHostingProviderConfiguration{
+function GetHostingProviderConfiguration {
     [cmdletbinding()]
     Param()
     
-    begin {}
+    begin {
+        [string]$tenantDomain = $uiHash.TenantDomainText + ".onmicrosoft.com"
+        $uiHash.tenantInfo = GetTenantInfo -TenantDomain $tenantDomain
+        if ([string]::IsNullOrEmpty($uiHash.tenantInfo)){
+            ProcessResult -testName 'Obtain hosting provider URL' -testMessage "Error retrieving tenant domain using GetTenantInfo function!" -testExpectedValue "(Office 365 Admin URL)" -testValue "Null"
+            return
+        }
+    }
     process {
         #### get Hosting Provider Configuration ###
-        $hostingProviderConfig = Get-CsHostingProvider | Where-Object ProxyFqdn -eq $resources.HostingProviderProxyFqdn
+        $hostingProviderConfig = Get-CsHostingProvider | Where-Object ProxyFqdn -eq 'sipfed.online.lync.com'
+
+        #we will accept this alternate:
+        if ($hostingProviderConfig.AutoDiscoverUrl -eq "https://webdir.online.lync.com/AutoDiscover/AutoDiscoverService.svc/root") {
+            $uiHash.tenantInfo = $hostingProviderConfig.AutoDiscoverUrl
+        }
 
         #since we can get back multiple objects from Get-CsHostingProvider we perform the filter above. Since the 'Identity' and 'Name' values for this object are subject to change, we just need to verify the ProxyFqdn is set correctly on one of the objects returned.
-        if ($hostingProviderConfig){
+        if ($hostingProviderConfig) {
             #check Proxy FQDN
-            ProcessResult -testId $resources.HostingProviderProxyFqdnTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderProxyFqdnErrorMessage -testSuccessMessage $resources.HostingProviderProxyFqdnSuccessMessage -testExpectedValue $resources.HostingProviderProxyFqdn -testValue $hostingProviderConfig.ProxyFqdn
+            ProcessResult -testName 'Hosting Provider: ProxyFqdn'  -testExpectedValue 'sipfed.online.lync.com' -testValue $hostingProviderConfig.ProxyFqdn
             #check Enablement
-            ProcessResult -testId $resources.HostingProviderEnabledTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderEnabledErrorMessage -testSuccessMessage $resources.HostingProviderEnabledSuccessMessage -testExpectedValue $resources.HostingProviderEnabled -testValue $hostingProviderConfig.Enabled
+            ProcessResult -testName 'Hosting Provider: Enabled' -testExpectedValue $true -testValue $hostingProviderConfig.Enabled
             #check Shared Address Space
-            ProcessResult -testId $resources.HostingProviderSharedAddressSpaceTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderSharedAddressSpaceErrorMessage -testSuccessMessage $resources.HostingProviderSharedAddressSpaceSuccessMessage -testExpectedValue $resources.HostingProviderSharedAddressSpace -testValue $hostingProviderConfig.EnabledSharedAddressSpace
+            ProcessResult -testName 'Hosting Provider: SharedAddressSpace' -testExpectedValue $true -testValue $hostingProviderConfig.EnabledSharedAddressSpace
             #check Hosts OCS Users
-            ProcessResult -testId $resources.HostingProviderHostOCSUsersTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderHostOCSUsersErrorMessage -testSuccessMessage $resources.HostingProviderHostOCSUsersSuccessMessage -testExpectedValue $resources.HostingProviderHostOCSUsers -testValue $hostingProviderConfig.HostsOCSUsers
+            ProcessResult -testName 'Hosting Provider: HostOcsUsers' -testExpectedValue $true -testValue $hostingProviderConfig.HostsOCSUsers
             #check Verification level
-            ProcessResult -testId $resources.HostingProviderVerificationLevelTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderVerificationLevelErrorMessage -testSuccessMessage $resources.HostingProviderVerificationLevelSuccessMessage -testExpectedValue $resources.HostingProviderVerificationLevel -testValue $hostingProviderConfig.VerificationLevel
+            ProcessResult -testName 'Hosting Provider: VerificationLevel' -testExpectedValue 'UseSourceVerification' -testValue $hostingProviderConfig.VerificationLevel
             #check IsLocal
-            ProcessResult -testId $resources.HostingProviderIsLocalTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderIsLocalErrorMessage -testSuccessMessage $resources.HostingProviderIsLocalSuccessMessage -testExpectedValue $resources.HostingProviderIsLocal -testValue $hostingProviderConfig.IsLocal
-            
+            ProcessResult -testName 'Hosting Provider: IsLocal' -testExpectedValue $false -testValue $hostingProviderConfig.IsLocal
             ### NOTE:check AutoDiscoverUrl obtained from GetTenantInfo function
-            ProcessResult -testId $resources.HostingProviderUrlTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderUrlErrorMessage -testSuccessMessage $resources.HostingProviderUrlSuccessMessage -testExpectedValue $tenantInfo -testValue $hostingProviderConfig.AutoDiscoverUrl
-        }else{
+            ProcessResult -testName 'Hosting Provider: AutoDiscoverUrl' -testExpectedValue $uiHash.tenantInfo -testValue $hostingProviderConfig.AutoDiscoverUrl
+        } else {
             #we didn't find a match for the Hosting Provider
-            ProcessResult -testId $resources.HostingProviderTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.HostingProviderErrorMesssage
+            ProcessResult -testName 'Hosting Provider: Error' -testMessage "There was an error obtaining the hosting provider information"
         }
 
     }
     end {}
 }
 
-function GetTenantFederationConfiguration{
-    [cmdletbinding()]
-    Param()
+function GetSharedSipAddressSpace{
+        #need to check the PSSession and import it
+        $uiHash.Status = "Starting GetSharedSipAddressSpace..."
+        Start-Sleep -Seconds 10
+        if ($uiHash.SfboSession.State -eq "Opened" -and $uiHash.SfboSession.Availability -eq "Available") {
+            #import the PSSession since it's healthy
+            $uiHash.Status = "Attempting to import the PSSession..."
+            Start-Sleep -Seconds 10
+            
+            try {
+                $uiHash.PSSession = Import-PSSession $uiHash.SfboSession -Prefix Sfbo -AllowClobber
+            } catch {
+                $uiHash.Status = $_.Exception.Message
+            }
+            
+        } else {
+            $uiHash.Status = "Error importing remote PowerShell session due to a broken or stale session. Try to re-authenticate by closing the application and trying again."
+            Start-Sleep -Seconds 5
+            ProcessResult -testName GetSharedSipAddressSpace -testExpectedValue $true -testValue "Error" -testMessage $uiHash.Status
+        }
 
-    begin {}
-    process {
         $tenantFedConfig = Get-SfboCsTenantFederationConfiguration
-        ProcessResult -testId $resources.TenantSharedSipTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.TenantSharedSipErrorMessage -testSuccessMessage $resources.TenantSharedSipSuccessMessage -testExpectedValue $resources.TenantSharedSip -testValue $tenantFedConfig.SharedSipAddressSpace
-    }
-    end {}
+        ProcessResult -testName GetSharedSipAddressSpace -testExpectedValue $true -testValue $tenantFedConfig.SharedSipAddressSpace
 }
 
 function InvokeSkypeOnlineConnection{
-    [cmdletbinding()]
-    Param()
-    begin{}
-    process{
-        #determine if Skype for Business PsSession is loaded in memory
-        $sessionInfo = Get-PsSession
-
-        #remove any PSSession previously established
-        foreach ($sessionItem in $sessionInfo){
-            if ($sessionItem.ComputerName.Contains(".online.lync.com")){
-                Write-Verbose -Message $resources.PSSessionRemovalMessage
-                $sessionItem | Remove-PSSession
-            }
-        }
-
-        Write-Verbose -Message $resources.NewSkypeOnlineSessionMessage
-
-        try{
-            if (!$SkypeOnlineCredentials){
-                Write-Output $resources.SFBONoCredsMessage
-                if (!$OverrideAdminDomain){
-                    $lyncsession = New-CsOnlineSession -ErrorAction SilentlyContinue -ErrorVariable $newOnlineSessionError
-                }else{
-                    $lyncsession = New-CsOnlineSession -ErrorAction SilentlyContinue -OverrideAdminDomain $TenantDomain -ErrorVariable $newOnlineSessionError
-                }
-            }else{
-                if (!$OverrideAdminDomain){
-                    $lyncsession = New-CsOnlineSession -Credential $SkypeOnlineCredentials -ErrorAction SilentlyContinue -ErrorVariable $newOnlineSessionError
-                }else{
-                    $lyncsession = New-CsOnlineSession -Credential $SkypeOnlineCredentials -OverrideAdminDomain $TenantDomain -ErrorAction SilentlyContinue -ErrorVariable $newOnlineSessionError
-                }
-            }
-        }catch{
-            throw $_
-        }finally{
-            if ($newOnlineSessionError){
-                throw $newOnlineSessionError
-            }    
-        }
-
-        Write-Verbose -Message $resources.ImportingPSSessionMessage
-        try{
-            Import-PSSession $lyncsession -Prefix Sfbo -ErrorAction SilentlyContinue -ErrorVariable $psSessionError | Out-Null
-        }
-        catch{
-            throw
-        }
-        
+    if (!$uiHash.ValidatedUserName) {
+        $uiHash.Status = "Error detected. Cannot determine username."
+        return
     }
-    end{}
+
+    $uihash.ConnectIsEnabled = $false
+    $uiHash.ProgressBarStatus = "50"
+    $uiHash.ProgressBarVisibility = "Visible"
+    $uiHash.Status = "Attempting to authenticate to Skype for Business Online..."
+    $uiHash.SfboStatusText = "Connecting..."
+
+    try {
+
+        if ($uiHash.AdminDomainIsChecked) {
+            $uiHash.SfboSession = New-CsOnlineSession -UserName $uiHash.ValidatedUserName -OverrideAdminDomain ($uiHash.TenantDomainText + ".onmicrosoft.com") -ErrorAction SilentlyContinue -WarningAction SilentlyContinue                
+        } else {
+            $uiHash.SfboSession = New-CsOnlineSession -UserName $uiHash.ValidatedUserName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+        }
+
+        $uiHash.SfboStatusText = "Successfully authenticated to Skype for Business Online. Waiting to start tests before importing the PSSession..."
+
+        #$uiHash.Status = "Attempting to import remote PowerShell session..."
+        #$uiHash.ProgressBarStatus = "60"
+        #$uiHash.PSSessionImportResult = Import-PSSession $uiHash.SfboSession -Prefix Sfbo -ErrorAction SilentlyContinue
+
+    } catch [System.ArgumentNullException] {
+
+        $uiHash.SfboStatusText = "Could not create the session. Possibly due to a bad username/password."
+        $uiHash.ConnectIsEnabled = $true
+        $uiHash.Status = "Ready"
+        return
+
+    } catch {
+
+        $uihash.SfboStatusText = $_.Exception.Message
+        $uiHash.ConnectIsEnabled = $true
+
+    }
+
+    $uiHash.ProgressBarVisibility = "Hidden"
+    $uiHash.ProgressBarStatus = "0"
+    $uiHash.Status = "Ready"
+
+        #validate SFBO connection
+        #if ($uiHash.PSSessionImportResult) {
+        #    $uiHash.SfboStatusText = "Connected to Skype for Business Online"
+        #}
 }
 
-function ProcessResult{
-    [cmdletbinding()]
-    Param
-    (
-        [Parameter(Mandatory=$true)][string]$testId,
-        [Parameter(Mandatory=$true)][string]$testName,
-        [Parameter(Mandatory=$false)]$sourceComputerName,
-        [Parameter(Mandatory=$false)]$destinationComputerName,
-        [Parameter(Mandatory=$false)][string]$testErrorMessage,
-        [Parameter(Mandatory=$false)][string]$testSuccessMessage,
-        [Parameter(Mandatory=$true)]$testExpectedValue,    
-        [Parameter(Mandatory=$true)]$testValue
-    )
-
-    begin {}
-    process {
-        [array]$outputResult = [PSCustomObject][ordered]@{
-            TestId = $testId
-            TestName = $testName
-            SourceComputerName = $sourceComputerName
-            DestinationComputerName = $destinationComputerName
-            ErrorMessage = $(if ($testExpectedValue -ne $testValue){$testErrorMessage}else{$testErrorMessage = $null})
-            SuccessMessage = $(if ($testExpectedValue -eq $testValue){$testSuccessMessage}else{$testSuccessMessage = $null})
-            ExpectedValue = $testExpectedValue
-            TestedValue = $testValue
-            TestedResult = $(if ($testExpectedValue -ne $testValue){"FAIL"}else{"PASS"})
-            TestDate = $(Get-Date)
-        }
-    }
-    end {
-        return $outputResult
-    }
-}
-
-function TestFrontEndServers{
-    [cmdletbinding()]
-    Param
-    ()
-
-    begin {
-        $testId = $resources.FeServerPortTestId
-    }
-    process {
+function TestFEToEdgePorts {
         #find all Edge servers to test FE to EDGE association
         [array]$edgeServers = ((Get-CsService -EdgeServer).Identity).Replace("EdgeServer:","")
 
         #note: we don't do a Get-CsService -Registrar here because we want the associated FE's for all Edge servers. Some FE's might not have an Edge association defined.
         [array]$poolServers = (((Get-CsService -EdgeServer).DependentServiceList) | Where-Object {$_ -like "Registrar:*"}).Replace("Registrar:","")
         $registrarServers = ($poolServers | ForEach-Object {Get-CsPool -Identity $_}).Computers
-        [array]$frontEndToEdgePorts = ($resources.FeServerPortTestList).split(",")
+        [array]$frontEndToEdgePorts = 443,4443,5061,5062,8057,50001,50002,50003
+
         $edgeServerTestResults = TestTcpPortConnection -Ports $frontEndToEdgePorts -Source $registrarServers -Destination $edgeServers
         $edgeServerTestResults | ForEach-Object {
-            ProcessResult -testId $resources.FeServerPortTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $_.Destination -testErrorMessage $($resources.FeServerPortTestErrorMessage + $_.Port) -testSuccessMessage $($resources.FeServerPortTestSuccessMessage + $_.Port) -testExpectedValue $resources.PortTestExpected -testValue $_.TestResult
+
+            if ($_.TestResult -eq "Connected") {
+                #success; write it out
+                $testMessage = "Successfully connected to {0} from {1} on port {2}." -f $_.Destination, $_.Source, $_.Port
+            } else {
+                $testMessage = "Unable to establish TCP connection from {0} to {1} on {2}." -f $_.Source, $_.Destination, $_.Port
+            }
+            
+            ProcessResult -testName TestFEtoEdgePorts -sourceComputerName $_.PSComputerName -destinationComputerName $_.Destination -testMessage $testMessage -testValue $_.TestResult -testExpectedValue "Connected"
         }
-    }
-    end {}
-}
-
-function CompareFederationBetweenOnlineOnPrem {
-    [cmdletbinding()]
-    param(
-
-    )
-    begin{
-        #make sure SFBO connection is established
-        $session = Get-PSSession | Where-Object {$_.ComputerName -like "*online.lync.com" -and $_.State -eq "Opened" -and $_.Availability -eq "Available"} -ErrorAction SilentlyContinue
-        if (!$session){
-            return ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.NoSfboConnection
-        }
-    }
-    process{
-        if (!($fedResult = Get-SfboCsTenantFederationConfiguration).AllowFederatedUsers){
-            #federation is turned off in the tenant
-            return ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testErrorMessage $resources.CompareFederationSettingsOnlineFedError -testExpectedValue $resources.CompareFederationSettingsAllowFed -testValue $fedResult.AllowFederatedUsers
-        }else{
-            ProcessResult -testId $resources.CompareFederationSettingsTestId -testName $PSCmdlet.CommandRuntime -testSuccessMessage $resources.CompareFederationSettingsSuccessMessage -testExpectedValue $resources.CompareFederationSettingsAllowFed -testValue $fedResult.AllowFederatedUsers
-        }
-
-    }
-    end{}
-
 }
 
 function TestTcpPortConnection{
@@ -602,19 +609,19 @@ function TestTcpPortConnection{
         [Parameter(mandatory=$true)][array]$Ports,
         [Parameter(Mandatory=$false)][int32]$TimeoutInMs = 1000
     )
-    begin{}
-    process{
-        ForEach ($d in $Destination){
+    begin {}
+    process {
+        ForEach ($d in $Destination) {
             #we should remove the source server from the array just in case since we don't want to test from/to the same server
-            If ($Source.Contains($d)){
-                Write-Verbose -Message $resources.PortTestRemoveDestinationMessage
+            If ($Source.Contains($d)) {
                 [System.Collections.ArrayList]$NewSource = $Source #alternatively we could use $NewSource = $Source -ne $d
                 $NewSource.Remove($d)
-            }else{
+            } else {
                 $NewSource = $Source
             }
-            ForEach ($p in $Ports){
-                try{
+            ForEach ($p in $Ports) {
+                try {
+                    $uiHash.Status = "Testing TCP connection from Front-End servers to {0} using port {1}..." -f $d, $p
                     [array]$portTestResult += Invoke-Command -ScriptBlock {
                         $Socket = New-Object System.Net.Sockets.TCPClient;
                         $Connection = $Socket.BeginConnect($args[0],$args[1],$null,$null);
@@ -629,11 +636,11 @@ function TestTcpPortConnection{
                         Return $bucket;
                         $bucket = $null;
                     } -ComputerName $NewSource -Args $d,$p,$TimeoutInMs -ErrorAction SilentlyContinue -ErrorVariable $testTcpError
-                }catch{
-                    ProcessResult -testId $testId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $d -testErrorMessage $_ -testExpectedValue $resources.PortTestExpected -testValue "Exception"
-                }finally{
+                } catch {
+                    ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $d -testErrorMessage $_ -testExpectedValue $resources.PortTestExpected -testValue "Exception"
+                } finally {
                     if ($testTcpError){
-                        ProcessResult -testId $testId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $d -testErrorMessage $_ -testExpectedValue $resources.PortTestExpected -testValue "Error"
+                        ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $d -testErrorMessage $_ -testExpectedValue $resources.PortTestExpected -testValue "Error"
                     }
                 }
             }
@@ -646,7 +653,7 @@ function TestTcpPortConnection{
     }
 }
 
-function TestServerPatchVersion{
+function TestServerPatchVersion {
     [cmdletbinding()]
     Param()
     begin {
@@ -666,24 +673,24 @@ function TestServerPatchVersion{
                 #powershell remoting used to fan out for speed
                 $patchResult = (Invoke-Command -ScriptBlock {Get-CsServerPatchVersion} -ComputerName $servers -ErrorAction SilentlyContinue -ErrorVariable patchError | Where-Object ComponentName -eq $serviceFriendlyName)
             }catch{
-                ProcessResult -testId $patchTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $_ -testExpectedValue $patchVersion -testValue "Exception"
+                ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $_ -testExpectedValue $patchVersion -testValue "Exception"
             }finally{
                 if ($patchError){
-                    ProcessResult -testId $patchTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchError -testExpectedValue $patchVersion -testValue "Error"
+                    ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchError -testExpectedValue $patchVersion -testValue "Error"
                 }
             }
             
             
             #process results for this service item
             $patchResult | ForEach-Object {
-                ProcessResult -testId $patchTestId -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchErrorMessage -testSuccessMessage $patchSuccessMessage -testExpectedValue $patchVersion -testValue $_.Version
+                ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchErrorMessage -testSuccessMessage $patchSuccessMessage -testExpectedValue $patchVersion -testValue $_.Version
             }
         }
     }
     end {}
 }
 
-function GetTenantInfo{
+function GetTenantInfo {
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory = $true, Position = 1)][ValidateNotNull()][string] $TenantDomain,
@@ -693,7 +700,7 @@ function GetTenantInfo{
         [Parameter(Mandatory = $false)][string] $acsFQDN = $null
     )
     begin{
-        $ErrorActionPreference = "Stop"
+        #$ErrorActionPreference = "Stop"
     }
 
     process{
@@ -729,11 +736,15 @@ function GetTenantInfo{
         }catch [System.Net.WebException]{
             $webEx = ($Error[0].Exception.InnerException) -as [System.Net.WebException]
             if (($webEx -ne $null) -and ($webEx.Status -eq [System.Net.WebExceptionStatus]::ProtocolError)){
-                throw "Domain $TenantDomain is not registired with ACS/O365"
+                $uiHash.Status = "Domain $TenantDomain is not registired with ACS/O365"
+                return;
+            } else {
+                $uiHash.Status = "There was an exception getting the URL for the admin domain in Office 365!"
+                return;
             }
-            throw
         }catch{
-            throw
+            $uiHash.Status = "There was an exception getting the URL for the admin domain in Office 365!"
+            return;
         }
 
         # Now get response from Lync SfB autodiscover service
@@ -843,50 +854,36 @@ function GetTenantInfo{
     }
 }
 
-function XamlConversion {
-    [CmdletBinding()]
-    param (
-        [parameter(Mandatory=$true)][string]$xmlWpfPath
+function ProcessResult{
+    [cmdletbinding()]
+    Param
+    (
+        [Parameter(Mandatory=$true)][string]$testName,
+        [Parameter(Mandatory=$false)]$sourceComputerName,
+        [Parameter(Mandatory=$false)]$destinationComputerName,
+        [Parameter(Mandatory=$false)][string]$testErrorMessage,
+        [Parameter(Mandatory=$false)][string]$testSuccessMessage,
+        [Parameter(Mandatory=$true)]$testExpectedValue,    
+        [Parameter(Mandatory=$true)]$testValue,
+        [Parameter(Mandatory=$false)][string]$testMessage
     )
 
-    begin {
-
-    }
-
+    begin {}
     process {
-        #get raw XAML file
-        $Global:xmlWPF = Get-Content -Path $xmlWpfPath
-
-        #scrape XAML for unwanted tags
-        [xml]$xAML = $xmlWPF -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
-
-        #create script instance of XAML content
-        $psCmd = [PowerShell]::Create().AddScript({$xAML})
-        
-        $xmlReader = (New-Object System.Xml.XmlNodeReader $xAML)
-        
-        $uiHash.Window = [Windows.Markup.XamlReader]::Load($xmlReader)
-        $uiHash.Text
-
-        #try {
-        #    $formMain = [Windows.Markup.XamlReader]::Load($xmlReader)
-        #} catch {
-        #    Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged properties (PowerShell cannot process them)"
-        #    throw;
-        #}
-        
-        $xAML.SelectNodes("//*[@Name]") | ForEach-Object {
-            #Set-Variable -Name "SFB$($_.Name)" -Value $formMain.FindName($_.Name) -Scope Global -Force -ErrorAction Stop
-            
-            #add form members to uiHash
-            $uiHash.Add($_.Name, $uiHash.Window.FindName($_.Name))
+        [array]$outputResult = [PSCustomObject][ordered]@{
+            'Test Name' = $testName
+            'Result' = $(if ($testExpectedValue -ne $testValue){"FAIL"}else{"PASS"})
+            'Expected Value' = $testExpectedValue
+            'Tested Value' = $testValue
+            'Message' = $testMessage
+            'Source Computer' = $sourceComputerName
+            'Destination Computer' = $destinationComputerName
+            'Test Date' = $(Get-Date)
         }
-
     }
-
     end {
-        return $formMain
+        $uiHash.Status = "Completed processing result for: $testName"
+        $uiHash.resultsHash += $outputResult
+        return $outputResult
     }
 }
-
-

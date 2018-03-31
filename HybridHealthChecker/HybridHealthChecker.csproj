@@ -66,8 +66,15 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="PowerShell\Modules\SkypeForBusinessHybridHealth\Splash.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="PowerShell\Modules\SkypeForBusinessHybridHealth\Splash.xaml.cs">
+      <DependentUpon>Splash.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -99,6 +106,8 @@
   <ItemGroup>
     <Resource Include="PowerShell\Modules\SkypeForBusinessHybridHealth\sfb.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Resource Include="PowerShell\Modules\SkypeForBusinessHybridHealth\Skype_for_Business_Logo.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
