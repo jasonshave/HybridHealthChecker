@@ -1,7 +1,9 @@
+<#
 function Get-SkypeForBusinessHybridHealth {
     Write-Host -ForegroundColor Green "This command has been deprecated. Starting new command: Invoke-SkypeForBusinessHybridHealthCheck"
     Invoke-SkypeForBusinessHybridHealthCheck
 }
+#>
 
 function Invoke-SkypeForBusinessHybridHealthCheck {
     ##############################
