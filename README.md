@@ -2,6 +2,10 @@
 
 This tool uses PowerShell runspaces along with XAML/WPF controls to provide a UI to various functions which test and validate a customer's hybrid configuration. The tests are designed to validate the best practices for the configuration of a hybrid Skype for Business or Lync Server 2013 environment.
 
+To install, simply type: `Install-Module SkypeForBusinessHybridHealth`
+
+To execute, simply type: `Invoke-SkypeForBusinessHybridHealthCheck`
+
 The following tests are performed:
 
 1. **GetCmsReplicationStatus** - This function checks all Central Management Store (CMS) replicas for any which are not 'up-to-date'. There could be cases where some or all servers show a failed state however this could be normal as replication happens regularly. While a failed replica is not an indication of an issue, there should be some investigation into a possible issue if the tests are run multiple times with the same replica in a failed state. 
