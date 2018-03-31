@@ -174,6 +174,8 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                     foreach ($rsp in $uiHash.Jobs) {
                         $uiHash.Jobs.$rsp.Dispose()
                     }
+                    
+                    $uiHash = $null
                 }
             )
 
