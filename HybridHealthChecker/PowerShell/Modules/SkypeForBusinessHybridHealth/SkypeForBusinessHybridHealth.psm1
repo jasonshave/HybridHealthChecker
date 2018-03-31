@@ -457,7 +457,7 @@ function GetAccessEdgeConfiguration {
         #check EnableParnterDiscovery
         $objResult = ProcessResult -testName 'Access Edge: PartnerDiscovery' -testExpectedValue $true -testValue $accessEdgeConfig.EnablePartnerDiscovery
         #checkUseDnsSrvRouting
-        $objResult = ProcessResult -testName 'Access Edge: UseDnsSrvRouting' -testExpectedValue UseDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
+        $objResult = ProcessResult -testName 'Access Edge: RoutingMethod' -testExpectedValue UseDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
     }
     end {}
 }
