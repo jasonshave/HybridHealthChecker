@@ -41,3 +41,4 @@ The following tests are performed:
 
 5. **GetSharedSipAddressSpace** - A connection is made from the on-premises computer to Skype for Business Online in an attempt to check the 'SharedSipAddressSpace' parameter. This needs to be set to $true so the test evaluates this.
 
+![Skype for Business Health Check Tool Splash Screen](https://1drv.ms/u/s!AtooN0Y6XdrWj7YddLg7niGPdBjHfw)
