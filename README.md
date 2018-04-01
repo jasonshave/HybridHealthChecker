@@ -6,6 +6,10 @@ To install, simply type: `Install-Module SkypeForBusinessHybridHealth`
 
 To execute, simply type: `Invoke-SkypeForBusinessHybridHealthCheck`
 
+Authenticate with an account which has been given Skype for Business administrative rights to complete the tests. 
+
+*NOTE: Accounts enabled for MFA are supported.*
+
 The following tests are performed:
 
 1. **GetCmsReplicationStatus** - This function checks all Central Management Store (CMS) replicas for any which are not 'up-to-date'. There could be cases where some or all servers show a failed state however this could be normal as replication happens regularly. While a failed replica is not an indication of an issue, there should be some investigation into a possible issue if the tests are run multiple times with the same replica in a failed state. 
