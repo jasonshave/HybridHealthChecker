@@ -411,8 +411,14 @@ function Invoke-CheckModules {
         $uiHash.SFBOAdminInstalledIsEnabled = $true
         $uiHash.SFBOAdminInstalledContent = "More Info"
     } else {
-        $uiHash.SFBOAdminInstalledIsEnabled = $false
-        $uiHash.SFBOAdminInstalledContent = "Installed"
+        #make sure we have the right version installed
+        if ($variableHash.SkypeOnlineConnector.Version.Major -eq 7) {
+            $uiHash.SFBOAdminInstalledIsEnabled = $false
+            $uiHash.SFBOAdminInstalledContent = "Installed"
+        } else {
+            $uiHash.SFBOAdminInstalledContent = "Needs update"
+            $uiHash.SFBOAdminInstalledIsEnabled = $true
+        }
     }
 }
 
