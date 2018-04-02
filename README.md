@@ -3,15 +3,14 @@
 This tool uses PowerShell runspaces along with XAML/WPF controls to provide a UI to various functions which test and validate a customer's hybrid configuration. The tests are designed to validate the best practices for the configuration of a hybrid Skype for Business or Lync Server 2013 environment.
 
 ## To Install:
-Simply type: `Install-Module SkypeForBusinessHybridHealth`
-
-Using PowerShell Gallery's built-in support for online repositories, the necessary files can be obtained and installed on the local machine.
 
 The following pre-requisites are required to run the module:
 
 1. [Skype for Business Online PowerShell Module (Version 7.0.0.0)](https://www.microsoft.com/en-us/download/details.aspx?id=39366)
     - [This requires WMF 5.1 (PowerShell 5.1) as well.](https://www.microsoft.com/en-us/download/details.aspx?id=54616)
 2. [Skype for Business Admin tools](https://technet.microsoft.com/en-ca/library/dn933921.aspx) or [Lync Server 2013 Admin tools](https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx)
+
+Simply type: `Install-Module SkypeForBusinessHybridHealth`
 
 ## To Execute:
 Simply type: `Invoke-SkypeForBusinessHybridHealthCheck`
