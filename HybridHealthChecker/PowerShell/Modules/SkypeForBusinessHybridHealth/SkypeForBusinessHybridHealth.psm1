@@ -555,10 +555,6 @@ function InvokeSkypeOnlineConnection{
 
         $uiHash.SfboStatusText = "Successfully authenticated to Skype for Business Online. Waiting to start tests before importing the PSSession..."
 
-        #$uiHash.Status = "Attempting to import remote PowerShell session..."
-        #$uiHash.ProgressBarStatus = "60"
-        #$uiHash.PSSessionImportResult = Import-PSSession $uiHash.SfboSession -Prefix Sfbo -ErrorAction SilentlyContinue
-
     } catch [System.ArgumentNullException] {
 
         $uiHash.SfboStatusText = "Could not create the session. Possibly due to a bad username/password."
@@ -577,10 +573,6 @@ function InvokeSkypeOnlineConnection{
     $uiHash.ProgressBarStatus = "0"
     $uiHash.Status = "Ready"
 
-        #validate SFBO connection
-        #if ($uiHash.PSSessionImportResult) {
-        #    $uiHash.SfboStatusText = "Connected to Skype for Business Online"
-        #}
 }
 
 function TestFEToEdgePorts {
