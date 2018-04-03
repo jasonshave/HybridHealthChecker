@@ -350,6 +350,7 @@ function ValidateSfboItems {
     if (!$uiHash.AdminDomainIsChecked) {
             try {
                 if (($uiHash.Username).Contains('@') -or [System.Net.Mail.MailAddress]($uiHash.Username)){
+                    #username shouldn't be in this format
                     $uiHash.UserNotifyText = "There is a problem with your username. It should be without an @ symbol."
                     $uiHash.ConnectIsEnabled = $false
                 } else {
