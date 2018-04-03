@@ -347,11 +347,22 @@ function ValidateSfboItems {
         }
     }
     #use standard login method
-    #if (!$uiHash.AdminDomainIsChecked -and (![string]::IsNullOrEmpty($uiHash.Username)) -and (![string]::IsNullOrEmpty($uiHash.TenantDomainText))) {
     if (!$uiHash.AdminDomainIsChecked) {
-            $uiHash.UserNotifyText = "We'll use: " + $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
-            $uiHash.ValidatedUserName = $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
-            $uiHash.ConnectIsEnabled = $true
+            try {
+                if (($uiHash.Username).Contains('@') -or [System.Net.Mail.MailAddress]($uiHash.Username)){
+                    $uiHash.UserNotifyText = "There is a problem with your username. It should be without an @ symbol."
+                    $uiHash.ConnectIsEnabled = $false
+                } else {
+                    #username shouldn't be in this format
+                    $uiHash.UserNotifyText = "Please enter just your username without the @ symbol."
+                    $uiHash.ConnectIsEnabled = $false
+                }
+            } catch {
+                $uiHash.UserNotifyText = "We'll use: " + $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
+                $uiHash.ValidatedUserName = $uiHash.Username + "@" + $uiHash.TenantDomainText + ".onmicrosoft.com"
+                $uiHash.ConnectIsEnabled = $true
+                return
+            }
     } else {
         $uiHash.UserNotifyText = ""
     }

@@ -24,7 +24,7 @@
 
                     <Label Content="Skype for Business Online"  HorizontalAlignment="Left" Height="32" Margin="10,201,0,0" VerticalAlignment="Top" Width="230" FontSize="16"/>
                     <Button Name="btnConnect" IsEnabled="False" Content="Connect" Margin="163,323,0,0" Height="24" HorizontalAlignment="Left" Width="100" VerticalAlignment="Top"/>
-                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain (enable if you need to authenticate with a federated account)" Margin="29,238,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="486"/>
+                    <CheckBox Name="chkAdminDomain" Content="Override Admin Domain" ToolTip="Check this box to use an account outside of the .onmicrosoft.com domain namespace such as an on-premises account." Margin="29,238,0,0" VerticalAlignment="Top" Height="24" HorizontalAlignment="Left" Width="486"/>
 
                     <TextBlock HorizontalAlignment="Left" Margin="29,267,0,0" TextWrapping="Wrap" Text="Tenant domain name:" VerticalAlignment="Top" Height="24" Width="129"/>
                     <TextBlock HorizontalAlignment="Left" Margin="308,267,0,0" TextWrapping="Wrap" Text=".onmicrosoft.com" VerticalAlignment="Top" Height="24" Width="125"/>
