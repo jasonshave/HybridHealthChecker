@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         
-        Name="MainForm" Title="Microsoft 365 FastTrack" Height="500" Width="900" Background="#FF0874AA" MinWidth="901" MinHeight="550" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
+        Name="MainForm" Title="Hybrid Health Check Tool" Height="500" Width="900" Background="#FF0874AA" MinWidth="901" MinHeight="550" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <x:Array x:Key="resultsData" Type="sys:Object"/>
     </Window.Resources>
