@@ -6,6 +6,8 @@ This tool uses PowerShell runspaces along with XAML/WPF controls to provide a UI
 
 The following pre-requisites are required to run the module:
 
+*NOTE: The Skype for Business Online module version 7.0.0.0 is capable of Modern Authentication (ADAL) and requires WMF 5.1.*
+
 1. [Skype for Business Online PowerShell Module (Version 7.0.0.0)](https://www.microsoft.com/en-us/download/details.aspx?id=39366)
     - [This requires WMF 5.1 (PowerShell 5.1) as well.](https://www.microsoft.com/en-us/download/details.aspx?id=54616)
 2. [Skype for Business Admin tools](https://technet.microsoft.com/en-ca/library/dn933921.aspx) or [Lync Server 2013 Admin tools](https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx)
