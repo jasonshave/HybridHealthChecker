@@ -54,3 +54,10 @@ The following tests are performed:
     - 50003
 
 5. **GetSharedSipAddressSpace** - A connection is made from the on-premises computer to Skype for Business Online in an attempt to check the 'SharedSipAddressSpace' parameter. This needs to be set to $true so the test evaluates this.
+
+## RELEASE NOTES:
+
+| DATE | VERSION | DESCRIPTION | 
+| ---- | ------- | ----------- | 
+| 4/4/2018 | 2.0.1.8 | - Fixed issue with module version not showing up correctly
+| 4/4/2018 | 2.0.1.8 | - Fixed logic of CMS replication & ErrorVariable (thx AT!)

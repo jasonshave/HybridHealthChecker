@@ -11,7 +11,7 @@
 
     <Grid>
         <Label Content="Skype for Business Hybrid Health Check Tool" Margin="10,10,10,0" VerticalAlignment="Top" Height="40" FontSize="18" Foreground="White"/>
-        <Image Name="picSfb" Source="C:\Users\jason.shave\source\repos\HybridHealthChecker\HybridHealthChecker\PowerShell\Modules\SkypeForBusinessHybridHealth\sfb.png" Margin="0,10,24,0" VerticalAlignment="Top" HorizontalAlignment="Right" Width="50"/>
+        <Image Name="picSfb" Margin="0,10,24,0" VerticalAlignment="Top" HorizontalAlignment="Right" Width="50"/>
         <TabControl Name="tabMain" Margin="10,55,10,34">
             <TabItem Name="tabConfiguration" Header="Configuration">
                 <Grid Margin="0,-26,0,0">

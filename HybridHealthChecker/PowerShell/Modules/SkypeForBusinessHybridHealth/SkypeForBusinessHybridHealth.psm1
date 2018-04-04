@@ -42,8 +42,9 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
     $variableHash.LyncTools = "https://technet.microsoft.com/en-us/library/gg398665(v=ocs.15).aspx"
     $variableHash.SfbTools = "https://technet.microsoft.com/en-ca/library/dn933921.aspx"
     $variableHash.SfbOTools = "https://www.microsoft.com/en-us/download/details.aspx?id=39366"
-    $variableHash.rootPath = Split-Path (Get-module SkypeForBusinessHybridHealth).path
-    $variableHash.requiredModules = @("SkypeOnlineConnector","SkypeForBusiness","Lync")
+    $variableHash.RootPath = Split-Path (Get-module SkypeForBusinessHybridHealth).path
+    $variableHash.RequiredModules = @("SkypeOnlineConnector","SkypeForBusiness","Lync")
+    $variableHash.Version = (Get-Module SkypeForBusinessHybridHealth).Version.ToString()
 
     foreach ($moduleName in $variableHash.requiredModules) {
         $variableHash.($moduleName) = Get-Module $moduleName -ListAvailable
@@ -109,7 +110,7 @@ function Invoke-SkypeForBusinessHybridHealthCheck {
                 {
                     $uiHash.picSfb.Source = ($variableHash.rootPath + "\sfb.png")
                     $uiHash.Window.Icon = ($variableHash.rootPath + "\sfb.png")
-                    $uiHash.txtVersion.Text = ((Get-Module SkypeForBusinessHybridHealth).Version).toString()
+                    $uiHash.txtVersion.Text = $variableHash.Version
 
                     $uiHash.comboVersion.ItemsSource = @("Skype for Business Server 2015","Lync Server 2013")
                     $uiHash.comboVersion.SelectedIndex = 0
@@ -438,46 +439,38 @@ function GetCmsReplicationStatus {
 
     $testExpectedValue = "None"
 
-    $cmsReplicationResult = Get-CsManagementStoreReplicationStatus -ErrorVariable $testMessage
-    if (!($cmsReplicationResult)) {
+    $cmsReplicationResult = Get-CsManagementStoreReplicationStatus -ErrorVariable testMessage
+    if (!$cmsReplicationResult) {
         $testValue = "Failed to execute test"
-    }
-
-    $failedReplicas = $cmsReplicationResult | Where-Object UpToDate -eq $False
-    if ($failedReplicas) {
-        #we have failed replication servers
-        [string]$testValue = $failedReplicas.ReplicaFqdn | ForEach-Object {$_ + "`r"}
-        $testMessage = "CMS Replica not up to date"
     } else {
-        #all is okay
-        $testValue = "None"
-        $testMessage = "All CMS replicas are up to date"
+        $failedReplicas = $cmsReplicationResult | Where-Object UpToDate -eq $false
+
+        if ($failedReplicas) {
+            #we have failed replication servers
+            [string]$testValue = $failedReplicas.ReplicaFqdn | ForEach-Object {$_ + "`r"}
+            $testMessage = "CMS replica not up to date"
+        } else {
+            #all is okay
+            $testValue = "None"
+            $testMessage = "All CMS replicas are up to date"
+        }
     }
 
-    [array]$objResult = ProcessResult -testName "GetCmsReplicationStatus" -testMessage $testMessage -testExpectedValue $testExpectedValue -testValue $testValue
-    
-    return $objResult
-
+    ProcessResult -testName "GetCmsReplicationStatus" -testMessage $testMessage -testExpectedValue $testExpectedValue -testValue $testValue
 }
 
 function GetAccessEdgeConfiguration {
-    [cmdletbinding()]
-    Param()
-    begin {}
-    process {
-        #### get Access Edge Configuration ###
-        $accessEdgeConfig = Get-CsAccessEdgeConfiguration
+    #### get Access Edge Configuration ###
+    $accessEdgeConfig = Get-CsAccessEdgeConfiguration
 
-        #check AllowOutsideUsers
-        $objResult = ProcessResult -testName 'Access Edge: AllowOutsideUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowOutsideUsers
-        #check AllowFederatedUsers
-        $objResult = ProcessResult -testName 'Access Edge: AllowFederatedUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowFederatedUsers
-        #check EnableParnterDiscovery
-        $objResult = ProcessResult -testName 'Access Edge: PartnerDiscovery' -testExpectedValue $true -testValue $accessEdgeConfig.EnablePartnerDiscovery
-        #checkUseDnsSrvRouting
-        $objResult = ProcessResult -testName 'Access Edge: RoutingMethod' -testExpectedValue UseDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
-    }
-    end {}
+    #check AllowOutsideUsers
+    ProcessResult -testName 'Access Edge: AllowOutsideUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowOutsideUsers
+    #check AllowFederatedUsers
+    ProcessResult -testName 'Access Edge: AllowFederatedUsers' -testExpectedValue $true -testValue $accessEdgeConfig.AllowFederatedUsers
+    #check EnableParnterDiscovery
+    ProcessResult -testName 'Access Edge: PartnerDiscovery' -testExpectedValue $true -testValue $accessEdgeConfig.EnablePartnerDiscovery
+    #checkUseDnsSrvRouting
+    ProcessResult -testName 'Access Edge: RoutingMethod' -testExpectedValue UseDnsSrvRouting -testValue $accessEdgeConfig.RoutingMethod        
 }
 
 function GetHostingProviderConfiguration {
@@ -650,7 +643,7 @@ function TestTcpPortConnection{
                         $Socket.Close | Out-Null;
                         Return $bucket;
                         $bucket = $null;
-                    } -ComputerName $NewSource -Args $d,$p,$TimeoutInMs -ErrorAction SilentlyContinue -ErrorVariable $testTcpError
+                    } -ComputerName $NewSource -Args $d,$p,$TimeoutInMs -ErrorAction SilentlyContinue -ErrorVariable testTcpError
                 } catch {
                     ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -destinationComputerName $d -testErrorMessage $_ -testExpectedValue $resources.PortTestExpected -testValue "Exception"
                 } finally {
@@ -694,8 +687,7 @@ function TestServerPatchVersion {
                     ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchError -testExpectedValue $patchVersion -testValue "Error"
                 }
             }
-            
-            
+                      
             #process results for this service item
             $patchResult | ForEach-Object {
                 ProcessResult -testName $PSCmdlet.CommandRuntime -sourceComputerName $_.PSComputerName -testErrorMessage $patchErrorMessage -testSuccessMessage $patchSuccessMessage -testExpectedValue $patchVersion -testValue $_.Version
@@ -715,7 +707,7 @@ function GetTenantInfo {
         [Parameter(Mandatory = $false)][string] $acsFQDN = $null
     )
     begin{
-        #$ErrorActionPreference = "Stop"
+        
     }
 
     process{
